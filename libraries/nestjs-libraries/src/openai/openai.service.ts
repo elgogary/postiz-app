@@ -74,6 +74,34 @@ export class OpenaiService {
     );
   }
 
+  // >>> SANAD-ENGAGEMENT
+  async generateEngagementComment(
+    postText: string,
+    brandVoice: string,
+    maxLen = 400
+  ) {
+    const CommentPrompt = z.object({ comment: z.string().max(maxLen) });
+    return (
+      (
+        await openai.chat.completions.parse({
+          model: 'gpt-4.1',
+          messages: [
+            {
+              role: 'system',
+              content: `You write short, authentic LinkedIn comments in this brand voice: ${brandVoice}. Reply with one specific, value-adding thought grounded in the author's own experience. Under ${maxLen} characters. No hashtags, no emojis, no generic praise like "Great post". Reply in the same language as the post (Arabic or English).`,
+            },
+            {
+              role: 'user',
+              content: `Post to comment on:\n${postText}`,
+            },
+          ],
+          response_format: zodResponseFormat(CommentPrompt, 'comment'),
+        })
+      ).choices[0].message.parsed?.comment || ''
+    );
+  }
+  // <<< SANAD-ENGAGEMENT
+
   async generatePosts(content: string) {
     const posts = (
       await Promise.all([

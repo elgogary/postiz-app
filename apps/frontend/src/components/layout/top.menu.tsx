@@ -156,6 +156,29 @@ export const useMenuItem = () => {
       ),
       path: '/third-party',
     },
+    // >>> SANAD-ENGAGEMENT
+    {
+      name: t('engagement', 'Engagement'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+          fill="none"
+        >
+          <path
+            d="M6 8.5H14M6 11.5H11M1.5 5.3C1.5 4.02 1.5 3.38 1.749 2.892C1.968 2.462 2.317 2.113 2.747 1.894C3.235 1.645 3.875 1.645 5.155 1.645H14.845C16.125 1.645 16.765 1.645 17.253 1.894C17.683 2.113 18.032 2.462 18.251 2.892C18.5 3.38 18.5 4.02 18.5 5.3V11.7C18.5 12.98 18.5 13.62 18.251 14.108C18.032 14.538 17.683 14.887 17.253 15.106C16.765 15.355 16.125 15.355 14.845 15.355H8.2L4.6 18.355V15.355H5.155C3.875 15.355 3.235 15.355 2.747 15.106C2.317 14.887 1.968 14.538 1.749 14.108C1.5 13.62 1.5 12.98 1.5 11.7V5.3Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      path: '/engagement',
+    },
+    // <<< SANAD-ENGAGEMENT
   ] satisfies MenuItemInterface[] as MenuItemInterface[];
 
   const secondMenu = [
