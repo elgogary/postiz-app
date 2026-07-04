@@ -226,12 +226,14 @@ const TargetsTab: FC = () => {
       ).json();
       mutate();
       if (res?.needsManual) {
-        toaster.show(
-          t('pull_manual', 'Auto-pull is off — paste the post text in the queue'),
-          'warning'
-        );
+        // Auto-pull is off (or the vendor was unavailable) -> let the human paste the post (guardrail 3).
+        modal.openModal({
+          title: t('paste_post', 'Paste the post to comment on'),
+          withCloseButton: true,
+          children: <ManualPasteDraft target={row} />,
+        });
       } else {
-        toaster.show(t('pulled', 'Pulled the latest post'), 'success');
+        toaster.show(t('pulled', 'Pulled the latest post — see the Review queue'), 'success');
       }
     },
     []
@@ -335,6 +337,55 @@ const AddOrEditTarget: FC<{ data?: any; reload: () => void }> = ({ data, reload 
         </div>
       </form>
     </FormProvider>
+  );
+};
+
+// Manual paste path (guardrail 3): create a pending draft from a post the human pasted.
+const ManualPasteDraft: FC<{ target: any }> = ({ target }) => {
+  const fetch = useFetch();
+  const t = useT();
+  const modal = useModals();
+  const toaster = useToaster();
+  const [text, setText] = useState('');
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = useCallback(async () => {
+    if (!text.trim()) return;
+    setBusy(true);
+    await fetch('/engagement/drafts', {
+      method: 'POST',
+      body: JSON.stringify({
+        targetId: target.id,
+        postText: text,
+        ...(url ? { postUrl: url } : {}),
+      }),
+    });
+    setBusy(false);
+    modal.closeAll();
+    toaster.show(t('draft_created', 'Draft created — open the Review queue'), 'success');
+  }, [text, url, target.id]);
+  return (
+    <div className="flex flex-col gap-[8px]">
+      <div className="text-[12px] text-customColor18">
+        {t('paste_post_help', "Paste the post text. A pending draft appears in the Review queue.")}
+      </div>
+      <textarea
+        dir="auto"
+        className="w-full min-h-[140px] bg-input border border-fifth rounded-[4px] p-[10px] text-[14px] outline-none"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={t('post_text', 'Post text')}
+      />
+      <input
+        className="bg-input border border-fifth rounded-[4px] p-[8px] text-[13px]"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder={t('post_url_optional', 'Post URL (optional)')}
+      />
+      <Button onClick={save} disabled={!text.trim() || busy}>
+        {busy ? t('working', 'Working...') : t('create_draft', 'Create draft')}
+      </Button>
+    </div>
   );
 };
 
