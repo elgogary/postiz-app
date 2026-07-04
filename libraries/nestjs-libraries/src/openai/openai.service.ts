@@ -80,25 +80,29 @@ export class OpenaiService {
     brandVoice: string,
     maxLen = 400
   ) {
-    const CommentPrompt = z.object({ comment: z.string().max(maxLen) });
-    return (
-      (
-        await openai.chat.completions.parse({
-          model: 'gpt-4.1',
-          messages: [
-            {
-              role: 'system',
-              content: `You write short, authentic LinkedIn comments in this brand voice: ${brandVoice}. Reply with one specific, value-adding thought grounded in the author's own experience. Under ${maxLen} characters. No hashtags, no emojis, no generic praise like "Great post". Reply in the same language as the post (Arabic or English).`,
-            },
-            {
-              role: 'user',
-              content: `Post to comment on:\n${postText}`,
-            },
-          ],
-          response_format: zodResponseFormat(CommentPrompt, 'comment'),
-        })
-      ).choices[0].message.parsed?.comment || ''
-    );
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === 'sk-proj-'
+    ) {
+      return '';
+    }
+    // Plain completion (not the json_schema .parse) + env-configurable model, so this works with any
+    // OpenAI-compatible endpoint set via OPENAI_BASE_URL (e.g. a self-hosted LiteLLM), not just OpenAI.
+    const res = await openai.chat.completions.create({
+      model: process.env.ENGAGEMENT_AI_MODEL || 'gpt-4.1',
+      temperature: 0.8,
+      messages: [
+        {
+          role: 'system',
+          content: `You write short, authentic LinkedIn comments in this brand voice: ${brandVoice}. Reply with one specific, value-adding thought grounded in the author's own experience. Under ${maxLen} characters. No hashtags, no emojis, no generic praise like "Great post". Reply in the same language as the post (Arabic or English). Output only the comment text, nothing else.`,
+        },
+        {
+          role: 'user',
+          content: `Post to comment on:\n${postText}`,
+        },
+      ],
+    });
+    return (res.choices?.[0]?.message?.content || '').trim();
   }
   // <<< SANAD-ENGAGEMENT
 

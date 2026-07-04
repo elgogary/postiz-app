@@ -112,11 +112,21 @@ export class EngagementService {
     if (!draft.postText) {
       throw new BadRequestException('Draft has no post text to comment on');
     }
-    const comment = await this._openai.generateEngagementComment(
-      draft.postText,
-      DEFAULT_VOICE,
-      400
-    );
+    let comment = '';
+    try {
+      comment = await this._openai.generateEngagementComment(
+        draft.postText,
+        DEFAULT_VOICE,
+        400
+      );
+    } catch (e) {
+      comment = '';
+    }
+    if (!comment) {
+      throw new BadRequestException(
+        'AI drafting is unavailable right now — write the comment yourself in the box below'
+      );
+    }
     // Reset edited=false: AI output re-locks posting so a human must rewrite AGAIN after any regenerate.
     await this._repo.updateDraftText(orgId, draftId, comment, false);
     return this._repo.getDraft(orgId, draftId);
