@@ -43,6 +43,10 @@ model Organization {
   webhooks            Webhooks[]
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
+  // >>> SANAD-ENGAGEMENT
+  engagementTargets   EngagementTarget[]
+  commentDrafts       CommentDraft[]
+  // <<< SANAD-ENGAGEMENT
 
   @@index([apiKey])
   @@index([streakSince])
@@ -968,3 +972,48 @@ model Announcement {
   color       AnnouncementColor @default(INFO)
   createdAt   DateTime          @default(now())
 }
+
+// >>> SANAD-ENGAGEMENT
+model EngagementTarget {
+  id             String         @id @default(uuid())
+  organizationId String
+  name           String
+  linkedinUrl    String
+  linkedinUrn    String?
+  headline       String?
+  tier           String         @default("B") // A|B|C — enforced via @IsIn in DTO (Postiz avoids enums to keep rebases clean)
+  lastPulledAt   DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  drafts         CommentDraft[]
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([deletedAt])
+}
+
+model CommentDraft {
+  id             String           @id @default(uuid())
+  organizationId String
+  targetId       String
+  postUrn        String?
+  postUrl        String?
+  postText       String?
+  draftText      String?
+  status         String           @default("pending") // pending|approved|posted|skipped
+  edited         Boolean          @default(false) // guardrail 5: human must rewrite before "Mark posted"
+  postedAt       DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  target         EngagementTarget @relation(fields: [targetId], references: [id])
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([targetId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// <<< SANAD-ENGAGEMENT
