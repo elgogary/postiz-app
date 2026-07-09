@@ -1,9 +1,15 @@
+'use client';
+
 import React from 'react';
+import i18next from 'i18next';
 
 // Sanad Marketing Hub wordmark — constellation-S badge + brand text (white-label of Postiz).
-// Badge is self-contained (purple bg, white S) so it shows on light AND dark; the text
-// uses currentColor so it adapts to the surrounding theme.
+// Badge is self-contained (purple bg, white S) so it shows on light AND dark; the brand
+// text switches to Arabic when the active locale is Arabic.
 export const LogoTextComponent = () => {
+  const isAr = (i18next.resolvedLanguage || i18next.language || 'en').startsWith(
+    'ar'
+  );
   return (
     <div className="flex items-center gap-[10px] text-current">
       <svg
@@ -34,7 +40,7 @@ export const LogoTextComponent = () => {
         <path d="M50 16 L51 19 L54 20 L51 21 L50 24 L49 21 L46 20 L49 19Z" fill="#ffffff" opacity="0.85" />
       </svg>
       <span className="text-[18px] font-[700] leading-none tracking-tight whitespace-nowrap">
-        Sanad Marketing Hub
+        {isAr ? 'سند للتسويق' : 'Sanad Marketing Hub'}
       </span>
     </div>
   );
