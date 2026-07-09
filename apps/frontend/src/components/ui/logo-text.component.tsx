@@ -40,7 +40,7 @@ export const LogoTextComponent = () => {
         <path d="M50 16 L51 19 L54 20 L51 21 L50 24 L49 21 L46 20 L49 19Z" fill="#ffffff" opacity="0.85" />
       </svg>
       <span className="text-[18px] font-[700] leading-none tracking-tight whitespace-nowrap">
-        {isAr ? 'سند للتسويق' : 'Sanad Marketing Hub'}
+        {isAr ? 'سند ماركتنج هب' : 'Sanad Marketing Hub'}
       </span>
     </div>
   );
