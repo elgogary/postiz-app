@@ -1,6 +1,8 @@
 import React from 'react';
 
-// Sanad Marketing Hub wordmark — constellation-S icon + brand text (white-label of Postiz)
+// Sanad Marketing Hub wordmark — constellation-S badge + brand text (white-label of Postiz).
+// Badge is self-contained (purple bg, white S) so it shows on light AND dark; the text
+// uses currentColor so it adapts to the surrounding theme.
 export const LogoTextComponent = () => {
   return (
     <div className="flex items-center gap-[10px] text-current">
@@ -12,24 +14,24 @@ export const LogoTextComponent = () => {
         xmlns="http://www.w3.org/2000/svg"
         className="shrink-0"
       >
+        <rect x="6" y="8" width="56" height="56" rx="15" fill="#612BD3" />
         <text
-          x="34"
-          y="50"
+          x="30"
+          y="52"
           textAnchor="middle"
           fontFamily="system-ui,-apple-system,sans-serif"
           fontWeight="900"
-          fontSize="48"
-          fill="currentColor"
+          fontSize="42"
+          fill="#ffffff"
         >
           S
         </text>
-        <circle cx="56" cy="10" r="3.5" fill="currentColor" opacity="0.85" />
-        <circle cx="65" cy="24" r="2.5" fill="currentColor" opacity="0.6" />
-        <circle cx="50" cy="3" r="2" fill="currentColor" opacity="0.5" />
-        <circle cx="64" cy="14" r="1.5" fill="currentColor" opacity="0.4" />
-        <line x1="56" y1="10" x2="65" y2="24" stroke="currentColor" strokeWidth="1" opacity="0.25" />
-        <line x1="56" y1="10" x2="50" y2="3" stroke="currentColor" strokeWidth="1" opacity="0.25" />
-        <path d="M58 6 L59 9 L62 10 L59 11 L58 14 L57 11 L54 10 L57 9Z" fill="currentColor" opacity="0.55" />
+        <circle cx="48" cy="20" r="3" fill="#ffffff" opacity="0.95" />
+        <circle cx="54" cy="30" r="2" fill="#ffffff" opacity="0.7" />
+        <circle cx="43" cy="15" r="1.6" fill="#ffffff" opacity="0.6" />
+        <line x1="48" y1="20" x2="54" y2="30" stroke="#ffffff" strokeWidth="1" opacity="0.4" />
+        <line x1="48" y1="20" x2="43" y2="15" stroke="#ffffff" strokeWidth="1" opacity="0.4" />
+        <path d="M50 16 L51 19 L54 20 L51 21 L50 24 L49 21 L46 20 L49 19Z" fill="#ffffff" opacity="0.85" />
       </svg>
       <span className="text-[18px] font-[700] leading-none tracking-tight whitespace-nowrap">
         Sanad Marketing Hub

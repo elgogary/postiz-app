@@ -1,6 +1,7 @@
 'use client';
 
-// Sanad Marketing Hub — constellation-S mark (white-label of Postiz)
+// Sanad Marketing Hub — constellation-S badge (white-label of Postiz).
+// Self-contained purple badge so it stays visible on light AND dark backgrounds.
 export const Logo = () => {
   return (
     <svg
@@ -9,35 +10,29 @@ export const Logo = () => {
       height="60"
       viewBox="0 0 72 72"
       fill="none"
-      className="mt-[8px] min-w-[60px] min-h-[60px] text-white"
+      className="mt-[8px] min-w-[60px] min-h-[60px]"
     >
+      {/* Brand badge */}
+      <rect x="6" y="8" width="56" height="56" rx="15" fill="#612BD3" />
       {/* Bold S */}
       <text
-        x="34"
-        y="50"
+        x="30"
+        y="52"
         textAnchor="middle"
         fontFamily="system-ui,-apple-system,sans-serif"
         fontWeight="900"
-        fontSize="48"
-        fill="currentColor"
+        fontSize="42"
+        fill="#ffffff"
       >
         S
       </text>
-      {/* Constellation dots */}
-      <circle cx="56" cy="10" r="3.5" fill="currentColor" opacity="0.85" />
-      <circle cx="65" cy="24" r="2.5" fill="currentColor" opacity="0.6" />
-      <circle cx="50" cy="3" r="2" fill="currentColor" opacity="0.5" />
-      <circle cx="64" cy="14" r="1.5" fill="currentColor" opacity="0.4" />
-      {/* Connection lines */}
-      <line x1="56" y1="10" x2="65" y2="24" stroke="currentColor" strokeWidth="1" opacity="0.25" />
-      <line x1="56" y1="10" x2="50" y2="3" stroke="currentColor" strokeWidth="1" opacity="0.25" />
-      <line x1="65" y1="24" x2="64" y2="14" stroke="currentColor" strokeWidth="0.8" opacity="0.2" />
-      {/* Sparkle */}
-      <path
-        d="M58 6 L59 9 L62 10 L59 11 L58 14 L57 11 L54 10 L57 9Z"
-        fill="currentColor"
-        opacity="0.55"
-      />
+      {/* Constellation dots + sparkle (white on badge) */}
+      <circle cx="48" cy="20" r="3" fill="#ffffff" opacity="0.95" />
+      <circle cx="54" cy="30" r="2" fill="#ffffff" opacity="0.7" />
+      <circle cx="43" cy="15" r="1.6" fill="#ffffff" opacity="0.6" />
+      <line x1="48" y1="20" x2="54" y2="30" stroke="#ffffff" strokeWidth="1" opacity="0.4" />
+      <line x1="48" y1="20" x2="43" y2="15" stroke="#ffffff" strokeWidth="1" opacity="0.4" />
+      <path d="M50 16 L51 19 L54 20 L51 21 L50 24 L49 21 L46 20 L49 19Z" fill="#ffffff" opacity="0.85" />
     </svg>
   );
 };
