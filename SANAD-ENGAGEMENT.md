@@ -66,3 +66,12 @@ provider in `api.module.ts` (checklist item 2 now also touches this). New env, a
 defaults: `ENGAGEMENT_PULL_CRON` (blank ⇒ every 30 min), `ENGAGEMENT_PULL_MIN_AGE_MIN` (360),
 `ENGAGEMENT_PULL_BATCH` (25). Sequential with a 1.5s gap per target to stay under the RapidAPI quota.
 Cron runs in the backend process only (orchestrator/commands also load DatabaseModule but not this provider).
+
+## Apify scraper adapter (cheaper vendor swap, 2026-07-11)
+`apify.linkedin.adapter.ts` (identifier `apify`) added as a THIRD adapter, preferred first in the
+scraper manager: `[Apify, Fresh, Manual]`. `available()` = `APIFY_TOKEN` set AND `ENGAGEMENT_AUTOPULL=true`.
+Uses the Apify actor `harvestapi/linkedin-profile-posts` via `run-sync-get-dataset-items` (one blocking
+HTTP call, ~8s, no async run/poll). Maps `content`->text, `linkedinUrl`->url, `postedAt.date`->timestamp,
+`id`->postUrn, `author.name`->author. Input `{targetUrls:[profileUrl], maxPosts:1}`. Cheaper than the Fresh
+RapidAPI vendor (~$1.5-2/1k posts vs $50/mo). New env: `APIFY_TOKEN`, `APIFY_POSTS_ACTOR`
+(default `harvestapi~linkedin-profile-posts`). Whichever key is set wins; both off => manual paste.
