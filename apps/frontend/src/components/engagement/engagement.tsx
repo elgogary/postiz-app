@@ -187,11 +187,16 @@ const DraftCard: FC<{ draft: any; reload: () => void }> = ({ draft, reload }) =>
         <Button secondary={true} onClick={remove}>
           {t('delete', 'Delete')}
         </Button>
-        {!canPost && (
-          <span className="text-[11px] text-customColor18">
-            {t('edit_to_enable', 'Edit the draft to enable posting')}
-          </span>
-        )}
+        <span className="text-[11px] text-customColor18">
+          {dirty
+            ? t('unsaved_click_save', 'Unsaved changes. Click "Save edit".')
+            : canPost
+            ? t('ready_mark_posted', '"Mark posted" copies the comment for LinkedIn.')
+            : t(
+                'rewrite_to_enable',
+                'Rewrite the comment in your own words to enable Save and Post.'
+              )}
+        </span>
       </div>
     </div>
   );
