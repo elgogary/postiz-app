@@ -205,6 +205,31 @@ export const useMenuItem = () => {
       path: '/engagement',
     },
     // <<< SANAD-ENGAGEMENT
+    // >>> SANAD (My LinkedIn analytics)
+    {
+      name: t('my_linkedin', 'My LinkedIn'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 3v18h18" />
+          <rect x="7" y="12" width="3" height="6" />
+          <rect x="12" y="8" width="3" height="10" />
+          <rect x="17" y="4" width="3" height="14" />
+        </svg>
+      ),
+      path: '/my-linkedin',
+      role: ['ADMIN', 'SUPERADMIN', 'USER'],
+    },
+    // <<< SANAD
   ] satisfies MenuItemInterface[] as MenuItemInterface[];
 
   const secondMenu = [

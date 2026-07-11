@@ -117,6 +117,65 @@ export class EngagementService {
   }
   // <<< SANAD-ENGAGEMENT
 
+  // >>> SANAD-ENGAGEMENT (my analytics)
+  // Personal LinkedIn engagement (likes/comments/reposts per post) via the Apify scraper.
+  // LinkedIn has NO personal analytics API, so this reads PUBLIC engagement counts only (no impressions).
+  async myLinkedInAnalytics(linkedinUrl: string, maxPosts = 10) {
+    if (!linkedinUrl) {
+      throw new BadRequestException('Provide your LinkedIn profile URL');
+    }
+    if (!process.env.APIFY_TOKEN) {
+      throw new BadRequestException('Scraper is not configured (APIFY_TOKEN)');
+    }
+    const actor =
+      process.env.APIFY_POSTS_ACTOR || 'harvestapi~linkedin-profile-posts';
+    const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(
+      process.env.APIFY_TOKEN
+    )}`;
+    let items: any[] = [];
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrls: [linkedinUrl],
+          maxPosts: Math.min(maxPosts || 10, 25),
+          scrapeReactions: false,
+          scrapeComments: false,
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!res.ok) {
+        throw new Error(String(res.status));
+      }
+      items = await res.json();
+    } catch {
+      throw new BadRequestException(
+        'Could not fetch your LinkedIn posts right now'
+      );
+    }
+    const posts = (Array.isArray(items) ? items : [])
+      .filter((it) => it && it.content)
+      .map((it) => ({
+        text: (it.content || '').slice(0, 280),
+        url: it.linkedinUrl || '',
+        date: it.postedAt?.date || '',
+        likes: it.engagement?.likes || 0,
+        comments: it.engagement?.comments || 0,
+        shares: it.engagement?.shares || 0,
+      }));
+    const totals = posts.reduce(
+      (a, p) => ({
+        likes: a.likes + p.likes,
+        comments: a.comments + p.comments,
+        shares: a.shares + p.shares,
+      }),
+      { likes: 0, comments: 0, shares: 0 }
+    );
+    return { count: posts.length, totals, posts };
+  }
+  // <<< SANAD-ENGAGEMENT (my analytics)
+
   // Manual paste path: the human supplies the post text they are already looking at.
   async createManualDraft(
     orgId: string,

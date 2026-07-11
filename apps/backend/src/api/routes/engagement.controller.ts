@@ -49,6 +49,19 @@ export class EngagementController {
     return this._engagementService.pullTarget(org.id, id);
   }
 
+  // >>> SANAD-ENGAGEMENT (my analytics)
+  @Post('/my-analytics')
+  myAnalytics(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: { linkedinUrl: string; maxPosts?: number }
+  ) {
+    return this._engagementService.myLinkedInAnalytics(
+      body.linkedinUrl,
+      body.maxPosts
+    );
+  }
+  // <<< SANAD-ENGAGEMENT (my analytics)
+
   @Get('/queue')
   queue(
     @GetOrgFromRequest() org: Organization,
