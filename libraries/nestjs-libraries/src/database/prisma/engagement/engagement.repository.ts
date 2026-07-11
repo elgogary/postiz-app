@@ -120,6 +120,13 @@ export class EngagementRepository {
       take: limit,
     });
   }
+
+  deleteContentIdea(orgId: string, id: string) {
+    return this._prisma.model.contentIdea.updateMany({
+      where: { id, organizationId: orgId },
+      data: { deletedAt: new Date() },
+    });
+  }
   // <<< SANAD-ENGAGEMENT
 
   getQueue(orgId: string, status?: string) {

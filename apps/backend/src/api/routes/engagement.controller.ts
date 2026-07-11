@@ -62,6 +62,34 @@ export class EngagementController {
   }
   // <<< SANAD-ENGAGEMENT (my analytics)
 
+  // >>> SANAD-ENGAGEMENT (idea bank UI)
+  @Get('/content-ideas')
+  contentIdeas(@GetOrgFromRequest() org: Organization) {
+    return this._engagementService.listContentIdeas(org.id);
+  }
+
+  @Post('/content-ideas')
+  createContentIdea(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: { idea: string; note?: string; source?: string }
+  ) {
+    return this._engagementService.addContentIdea(
+      org.id,
+      body.idea,
+      body.note,
+      body.source
+    );
+  }
+
+  @Delete('/content-ideas/:id')
+  deleteContentIdea(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    return this._engagementService.deleteContentIdea(org.id, id);
+  }
+  // <<< SANAD-ENGAGEMENT (idea bank UI)
+
   @Get('/queue')
   queue(
     @GetOrgFromRequest() org: Organization,

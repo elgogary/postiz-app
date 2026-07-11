@@ -248,6 +248,10 @@ export class EngagementService {
   listContentIdeas(orgId: string, limit = 50) {
     return this._repo.listContentIdeas(orgId, limit);
   }
+
+  deleteContentIdea(orgId: string, id: string) {
+    return this._repo.deleteContentIdea(orgId, id);
+  }
   // <<< SANAD-ENGAGEMENT
 
   // Manual paste path: the human supplies the post text they are already looking at.
