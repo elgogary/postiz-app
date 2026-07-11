@@ -1,10 +1,15 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Button } from '@gitroom/react/form/button';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+
+// Seeded default profile for this instance; the last-entered URL (localStorage) overrides it.
+const SEED_URL = 'https://www.linkedin.com/in/eslam-elgogary/';
+const LS_URL = 'my_linkedin_url';
+const LS_DATA = 'my_linkedin_last';
 
 interface Post {
   text: string;
@@ -24,42 +29,83 @@ export const MyLinkedin: FC = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(SEED_URL);
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState<Result | null>(null);
+  const [updatedAt, setUpdatedAt] = useState('');
 
-  const analyze = useCallback(async () => {
-    if (!url.trim()) {
-      toaster.show(
-        t('enter_linkedin_url', 'Enter your LinkedIn profile URL'),
-        'warning'
-      );
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await (
-        await fetch('/engagement/my-analytics', {
-          method: 'POST',
-          body: JSON.stringify({ linkedinUrl: url.trim(), maxPosts: 10 }),
-        })
-      ).json();
-      if (res?.posts) {
-        setData(res);
-      } else {
+  const runAnalyze = useCallback(
+    async (targetUrl: string) => {
+      const clean = (targetUrl || '').trim();
+      if (!clean) {
+        toaster.show(
+          t('enter_linkedin_url', 'Enter your LinkedIn profile URL'),
+          'warning'
+        );
+        return;
+      }
+      setBusy(true);
+      try {
+        const res = await (
+          await fetch('/engagement/my-analytics', {
+            method: 'POST',
+            body: JSON.stringify({ linkedinUrl: clean, maxPosts: 10 }),
+          })
+        ).json();
+        if (res?.posts) {
+          const stamp = new Date().toISOString();
+          setData(res);
+          setUpdatedAt(stamp);
+          try {
+            localStorage.setItem(LS_URL, clean);
+            localStorage.setItem(
+              LS_DATA,
+              JSON.stringify({ result: res, updatedAt: stamp, url: clean })
+            );
+          } catch (e) {
+            /* storage unavailable */
+          }
+        } else {
+          toaster.show(
+            t('could_not_fetch_posts', 'Could not fetch your posts'),
+            'warning'
+          );
+        }
+      } catch (e) {
         toaster.show(
           t('could_not_fetch_posts', 'Could not fetch your posts'),
           'warning'
         );
       }
+      setBusy(false);
+    },
+    [fetch, t, toaster]
+  );
+
+  // On open: show the saved last pull instantly; if there is none, auto-pull the seeded profile once.
+  useEffect(() => {
+    let start = SEED_URL;
+    try {
+      const savedUrl = localStorage.getItem(LS_URL);
+      if (savedUrl) {
+        start = savedUrl;
+      }
+      const raw = localStorage.getItem(LS_DATA);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.result?.posts) {
+          setUrl(parsed.url || start);
+          setData(parsed.result);
+          setUpdatedAt(parsed.updatedAt || '');
+          return;
+        }
+      }
     } catch (e) {
-      toaster.show(
-        t('could_not_fetch_posts', 'Could not fetch your posts'),
-        'warning'
-      );
+      /* ignore */
     }
-    setBusy(false);
-  }, [url]);
+    setUrl(start);
+    runAnalyze(start);
+  }, [runAnalyze]);
 
   const stat = (label: string, value: number, color: string) => (
     <div className="flex-1 min-w-[140px] bg-sixth border border-fifth rounded-[4px] p-[16px] flex flex-col gap-[6px]">
@@ -98,10 +144,21 @@ export const MyLinkedin: FC = () => {
           placeholder="https://www.linkedin.com/in/your-handle"
           className="flex-1 bg-input border border-fifth rounded-[4px] p-[10px] text-[14px] outline-none"
         />
-        <Button onClick={analyze} disabled={busy}>
-          {busy ? t('analyzing', 'Analyzing...') : t('analyze', 'Analyze')}
+        <Button onClick={() => runAnalyze(url)} disabled={busy}>
+          {busy
+            ? t('refreshing', 'Refreshing...')
+            : data
+            ? t('refresh', 'Refresh')
+            : t('analyze', 'Analyze')}
         </Button>
       </div>
+
+      {updatedAt && (
+        <div className="text-[11px] text-customColor18">
+          {t('last_updated', 'Last updated')}:{' '}
+          {new Date(updatedAt).toLocaleString()}
+        </div>
+      )}
 
       {data && (
         <div className="flex flex-col gap-[12px]">
