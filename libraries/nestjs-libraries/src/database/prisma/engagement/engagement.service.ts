@@ -90,6 +90,33 @@ export class EngagementService {
     return { draft, needsManual: false };
   }
 
+  // >>> SANAD-ENGAGEMENT
+  // Cron entry point: pull every DUE target across all orgs. Gated by the same kill switch as the
+  // button (manual adapter => no-op). Sequential with a small delay to stay under the scraper quota.
+  async runAutoPull(): Promise<Record<string, number | string>> {
+    if (!this._scraper.isAuto()) {
+      return { skipped: 'autopull-off' };
+    }
+    const minAge = Number(process.env.ENGAGEMENT_PULL_MIN_AGE_MIN) || 360;
+    const batch = Number(process.env.ENGAGEMENT_PULL_BATCH) || 25;
+    const due = await this._repo.getAllPullable(minAge, batch);
+    let drafted = 0;
+    let manual = 0;
+    let failed = 0;
+    for (const t of due) {
+      try {
+        const res: any = await this.pullTarget(t.organizationId, t.id);
+        if (res?.draft) drafted++;
+        if (res?.needsManual) manual++;
+      } catch {
+        failed++;
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    return { due: due.length, drafted, manual, failed };
+  }
+  // <<< SANAD-ENGAGEMENT
+
   // Manual paste path: the human supplies the post text they are already looking at.
   async createManualDraft(
     orgId: string,

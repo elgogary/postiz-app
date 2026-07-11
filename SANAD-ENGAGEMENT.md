@@ -55,3 +55,14 @@ Always fork off a **patched** release tag — never v1.47.0 (unauthenticated SSR
 Run `prisma db push` (create the two tables) via a **clean container restart** (`docker restart postiz`),
 NOT `pnpm run prisma-db-push` inside the live container — regenerating the client under the running
 backend leaves it stuck (process alive, not listening on :3000, nginx → 502). A restart re-bootstraps clean.
+
+## Auto-pull cron (fork addition, 2026-07-11)
+Background timer so targets refresh without a click. Backend-only `@Cron` in
+`apps/backend/src/services/engagement.cron.service.ts` → `EngagementService.runAutoPull()` →
+`EngagementRepository.getAllPullable()`. Gated by the SAME kill switch as the button
+(`ENGAGEMENT_AUTOPULL` + `RAPIDAPI_KEY`): manual adapter ⇒ the whole run is a no-op, so a dead/off
+vendor never spins. Wiring (both sentinel-fenced): `ScheduleModule.forRoot()` + `EngagementCronService`
+provider in `api.module.ts` (checklist item 2 now also touches this). New env, all optional with safe
+defaults: `ENGAGEMENT_PULL_CRON` (blank ⇒ every 30 min), `ENGAGEMENT_PULL_MIN_AGE_MIN` (360),
+`ENGAGEMENT_PULL_BATCH` (25). Sequential with a 1.5s gap per target to stay under the RapidAPI quota.
+Cron runs in the backend process only (orchestrator/commands also load DatabaseModule but not this provider).

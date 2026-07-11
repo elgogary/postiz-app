@@ -1,4 +1,8 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+// >>> SANAD-ENGAGEMENT (auto-pull cron)
+import { ScheduleModule } from '@nestjs/schedule';
+import { EngagementCronService } from '@gitroom/backend/services/engagement.cron.service';
+// <<< SANAD-ENGAGEMENT
 import { AuthController } from '@gitroom/backend/api/routes/auth.controller';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { UsersController } from '@gitroom/backend/api/routes/users.controller';
@@ -72,7 +76,7 @@ const authenticatedController = [
   AdminController,
 ];
 @Module({
-  imports: [UploadModule],
+  imports: [UploadModule, /* >>> SANAD-ENGAGEMENT */ ScheduleModule.forRoot() /* <<< SANAD-ENGAGEMENT */],
   controllers: [
     RootController,
     StripeController,
@@ -102,6 +106,9 @@ const authenticatedController = [
     FarcasterProvider,
     WalletProvider,
     OauthProvider,
+    // >>> SANAD-ENGAGEMENT
+    EngagementCronService,
+    // <<< SANAD-ENGAGEMENT
   ],
   get exports() {
     return [...this.imports, ...this.providers];

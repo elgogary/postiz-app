@@ -76,6 +76,26 @@ export class EngagementRepository {
     });
   }
 
+  // >>> SANAD-ENGAGEMENT
+  // Cron feed: due targets across ALL orgs (never pulled, or pulled longer ago than minAgeMinutes).
+  // A-tier first, oldest pull first, capped at limit to stay gentle on the scraper quota.
+  getAllPullable(minAgeMinutes: number, limit: number) {
+    const cutoff = new Date(Date.now() - minAgeMinutes * 60 * 1000);
+    return this._prisma.model.engagementTarget.findMany({
+      where: {
+        deletedAt: null,
+        OR: [{ lastPulledAt: null }, { lastPulledAt: { lt: cutoff } }],
+      },
+      select: { id: true, organizationId: true },
+      orderBy: [
+        { tier: 'asc' },
+        { lastPulledAt: { sort: 'asc', nulls: 'first' } },
+      ],
+      take: limit,
+    });
+  }
+  // <<< SANAD-ENGAGEMENT
+
   getQueue(orgId: string, status?: string) {
     return this._prisma.model.commentDraft.findMany({
       where: {
