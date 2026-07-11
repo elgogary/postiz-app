@@ -78,7 +78,8 @@ export class OpenaiService {
   async generateEngagementComment(
     postText: string,
     brandVoice: string,
-    maxLen = 400
+    maxLen = 400,
+    author?: { name?: string; headline?: string }
   ) {
     if (
       !process.env.OPENAI_API_KEY ||
@@ -86,19 +87,20 @@ export class OpenaiService {
     ) {
       return '';
     }
+    const who = [author?.name, author?.headline].filter(Boolean).join(', ');
     // Plain completion (not the json_schema .parse) + env-configurable model, so this works with any
-    // OpenAI-compatible endpoint set via OPENAI_BASE_URL (e.g. a self-hosted LiteLLM), not just OpenAI.
+    // OpenAI-compatible endpoint set via OPENAI_BASE_URL (DeepSeek, a self-hosted LiteLLM, etc.).
     const res = await openai.chat.completions.create({
       model: process.env.ENGAGEMENT_AI_MODEL || 'gpt-4.1',
       temperature: 0.8,
       messages: [
         {
           role: 'system',
-          content: `You write short, authentic LinkedIn comments in this brand voice: ${brandVoice}. Reply with one specific, value-adding thought grounded in the author's own experience. Under ${maxLen} characters. No hashtags, no emojis, no generic praise like "Great post". Reply in the same language as the post (Arabic or English). Output only the comment text, nothing else.`,
+          content: `You are leaving a LinkedIn comment AS a specific person whose voice is: ${brandVoice}\n\nWrite ONE reply to the post that:\n- Reacts to a SPECIFIC detail in the post (quote or paraphrase it) so it is clear you actually read it.\n- Adds real value: a first-hand insight, a concrete example from your own work, a sharp question, or a respectful counter-point. Pick ONE angle and go deep, not wide.\n- Sounds like a knowledgeable peer, never a fan. Never generic praise like "Great post", "Well said", "Thanks for sharing", "So insightful".\n- No hashtags, no emojis, no self-introduction, no "as an AI".\n- Same language as the post. If Arabic, natural spoken register, not stiff MSA.\n- Under ${maxLen} characters. Output ONLY the comment text.\n\nStyle to imitate (structure, not content):\nGOOD: "The fallback point is the real trap. We hit it when a supplier API stalled and the agent held the order open for hours. A hard timeout that flips to manual fixed it. How do you handle partial failures mid-run?"\nBAD: "Great post! Very insightful, thanks for sharing."`,
         },
         {
           role: 'user',
-          content: `Post to comment on:\n${postText}`,
+          content: `${who ? `Post author: ${who}\n` : ''}Their post:\n${postText}`,
         },
       ],
     });

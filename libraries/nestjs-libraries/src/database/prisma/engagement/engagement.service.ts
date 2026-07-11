@@ -139,12 +139,16 @@ export class EngagementService {
     if (!draft.postText) {
       throw new BadRequestException('Draft has no post text to comment on');
     }
+    const target = draft.targetId
+      ? await this._repo.getTarget(orgId, draft.targetId)
+      : null;
     let comment = '';
     try {
       comment = await this._openai.generateEngagementComment(
         draft.postText,
         DEFAULT_VOICE,
-        400
+        400,
+        { name: target?.name, headline: target?.headline }
       );
     } catch (e) {
       comment = '';
