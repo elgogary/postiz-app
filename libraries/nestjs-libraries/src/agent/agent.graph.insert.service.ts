@@ -10,8 +10,11 @@ import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/po
 
 const model = new ChatOpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-  model: 'gpt-4o-2024-08-06',
+  model: process.env.AGENT_AI_MODEL || 'gpt-4o-2024-08-06',
   temperature: 0,
+  ...(process.env.OPENAI_BASE_URL
+    ? { configuration: { baseURL: process.env.OPENAI_BASE_URL } }
+    : {}),
 });
 
 interface WorkflowChannelsState {
@@ -54,7 +57,7 @@ export class AgentGraphInsertService {
 
   async findCategory(state: WorkflowChannelsState) {
     const { messages } = state;
-    const structuredOutput = model.withStructuredOutput(category);
+    const structuredOutput = model.withStructuredOutput(category, { method: 'functionCalling' });
     return ChatPromptTemplate.fromTemplate(
       `
 You are an assistant that get a social media post and categorize it into to one from the following categories:
@@ -72,7 +75,7 @@ Here is the post:
 
   findTopic(state: WorkflowChannelsState) {
     const { messages } = state;
-    const structuredOutput = model.withStructuredOutput(topic);
+    const structuredOutput = model.withStructuredOutput(topic, { method: 'functionCalling' });
     return ChatPromptTemplate.fromTemplate(
       `
 You are an assistant that get a social media post and categorize it into one of the following topics:
@@ -90,7 +93,7 @@ Here is the post:
 
   findHook(state: WorkflowChannelsState) {
     const { messages } = state;
-    const structuredOutput = model.withStructuredOutput(hook);
+    const structuredOutput = model.withStructuredOutput(hook, { method: 'functionCalling' });
     return ChatPromptTemplate.fromTemplate(
       `
 You are an assistant that get a social media post and extract the hook, the hook is usually the first or second of both sentence of the post, but can be in a different place, make sure you don't change the wording of the post use the exact text:

@@ -23,8 +23,11 @@ const toolNode = new ToolNode(tools);
 
 const model = new ChatOpenAI({
   apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-  model: 'gpt-4.1',
+  model: process.env.AGENT_AI_MODEL || 'gpt-4.1',
   temperature: 0.7,
+  ...(process.env.OPENAI_BASE_URL
+    ? { configuration: { baseURL: process.env.OPENAI_BASE_URL } }
+    : {}),
 });
 
 const dalle = new DallEAPIWrapper({
@@ -156,7 +159,7 @@ export class AgentGraphService {
 
   async findCategories(state: WorkflowChannelsState) {
     const allCategories = await this._postsService.findAllExistingCategories();
-    const structuredOutput = model.withStructuredOutput(category);
+    const structuredOutput = model.withStructuredOutput(category, { method: 'functionCalling' });
     const { category: outputCategory } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets a text that will be later summarized into a social media post
@@ -183,7 +186,7 @@ export class AgentGraphService {
       return { topic: null };
     }
 
-    const structuredOutput = model.withStructuredOutput(topic);
+    const structuredOutput = model.withStructuredOutput(topic, { method: 'functionCalling' });
     const { topic: outputTopic } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets a text that will be later summarized into a social media post
@@ -211,7 +214,7 @@ export class AgentGraphService {
   }
 
   async generateHook(state: WorkflowChannelsState) {
-    const structuredOutput = model.withStructuredOutput(hook);
+    const structuredOutput = model.withStructuredOutput(hook, { method: 'functionCalling' });
     const { hook: outputHook } = await ChatPromptTemplate.fromTemplate(
       `
         You are an assistant that gets content for a social media post, and generate only the hook.
@@ -254,7 +257,8 @@ export class AgentGraphService {
 
   async generateContent(state: WorkflowChannelsState) {
     const structuredOutput = model.withStructuredOutput(
-      contentZod(!!state.isPicture, state.format)
+      contentZod(!!state.isPicture, state.format),
+      { method: 'functionCalling' }
     );
     const { content: outputContent } = await ChatPromptTemplate.fromTemplate(
       `
@@ -320,11 +324,16 @@ export class AgentGraphService {
 
     const newContent = await Promise.all(
       (state.content || []).map(async (p) => {
-        const image = await dalle.invoke(p.prompt!);
-        return {
-          ...p,
-          image,
-        };
+        try {
+          const image = await dalle.invoke(p.prompt!);
+          return {
+            ...p,
+            image,
+          };
+        } catch (e) {
+          // image provider unavailable (DeepSeek is text-only) -> keep the post without an image
+          return { ...p };
+        }
       })
     );
 
