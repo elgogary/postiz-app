@@ -1017,3 +1017,18 @@ model CommentDraft {
 }
 
 // <<< SANAD-ENGAGEMENT
+
+// >>> SANAD-ENGAGEMENT (content ideas)
+model ContentIdea {
+  id             String    @id @default(uuid())
+  organizationId String
+  idea           String
+  note           String?
+  source         String?
+  createdAt      DateTime  @default(now())
+  deletedAt      DateTime?
+
+  @@index([organizationId])
+}
+// <<< SANAD-ENGAGEMENT
+

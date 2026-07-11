@@ -9,7 +9,9 @@ import { EngagementTargetDto } from '@gitroom/nestjs-libraries/dtos/engagement/e
 @Injectable()
 export class EngagementRepository {
   constructor(
-    private _prisma: PrismaRepository<'engagementTarget' | 'commentDraft'>
+    private _prisma: PrismaRepository<
+    'engagementTarget' | 'commentDraft' | 'contentIdea'
+  >
   ) {}
 
   getTargets(orgId: string) {
@@ -91,6 +93,30 @@ export class EngagementRepository {
         { tier: 'asc' },
         { lastPulledAt: { sort: 'asc', nulls: 'first' } },
       ],
+      take: limit,
+    });
+  }
+  // <<< SANAD-ENGAGEMENT
+
+  // >>> SANAD-ENGAGEMENT (content ideas)
+  addContentIdea(
+    orgId: string,
+    data: { idea: string; note?: string; source?: string }
+  ) {
+    return this._prisma.model.contentIdea.create({
+      data: {
+        organizationId: orgId,
+        idea: data.idea,
+        note: data.note,
+        source: data.source,
+      },
+    });
+  }
+
+  listContentIdeas(orgId: string, limit = 50) {
+    return this._prisma.model.contentIdea.findMany({
+      where: { organizationId: orgId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
       take: limit,
     });
   }

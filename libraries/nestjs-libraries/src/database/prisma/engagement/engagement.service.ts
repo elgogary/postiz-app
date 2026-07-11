@@ -176,6 +176,80 @@ export class EngagementService {
   }
   // <<< SANAD-ENGAGEMENT (my analytics)
 
+  // >>> SANAD-ENGAGEMENT (mcp tools: suggest comment + idea bank)
+  // Read a LinkedIn post from a profile/post URL and draft a brand-voice comment. Stateless (MCP tool).
+  async suggestCommentForUrl(url: string) {
+    if (!url) {
+      throw new BadRequestException('Provide a LinkedIn profile or post URL');
+    }
+    if (!process.env.APIFY_TOKEN) {
+      throw new BadRequestException('Scraper is not configured (APIFY_TOKEN)');
+    }
+    const actor =
+      process.env.APIFY_POSTS_ACTOR || 'harvestapi~linkedin-profile-posts';
+    const apiUrl = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(
+      process.env.APIFY_TOKEN
+    )}`;
+    let items: any[] = [];
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrls: [url],
+          maxPosts: 1,
+          scrapeReactions: false,
+          scrapeComments: false,
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+      if (!res.ok) {
+        throw new Error(String(res.status));
+      }
+      items = await res.json();
+    } catch {
+      throw new BadRequestException('Could not fetch that LinkedIn post');
+    }
+    const latest = Array.isArray(items) ? items[0] : null;
+    if (!latest || !latest.content) {
+      throw new BadRequestException('No post text found at that URL');
+    }
+    let comment = '';
+    try {
+      comment = await this._openai.generateEngagementComment(
+        latest.content,
+        DEFAULT_VOICE,
+        400,
+        { name: latest.author?.name, headline: latest.author?.info }
+      );
+    } catch (e) {
+      comment = '';
+    }
+    return {
+      postText: (latest.content || '').slice(0, 600),
+      postUrl: latest.linkedinUrl || url,
+      author: latest.author?.name || '',
+      comment,
+    };
+  }
+
+  addContentIdea(
+    orgId: string,
+    idea: string,
+    note?: string,
+    source?: string
+  ) {
+    if (!idea || !idea.trim()) {
+      throw new BadRequestException('Idea text is required');
+    }
+    return this._repo.addContentIdea(orgId, { idea: idea.trim(), note, source });
+  }
+
+  listContentIdeas(orgId: string, limit = 50) {
+    return this._repo.listContentIdeas(orgId, limit);
+  }
+  // <<< SANAD-ENGAGEMENT
+
   // Manual paste path: the human supplies the post text they are already looking at.
   async createManualDraft(
     orgId: string,
