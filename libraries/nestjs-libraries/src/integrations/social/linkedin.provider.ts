@@ -32,13 +32,11 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
   isBetweenSteps = false;
   scopes = [
+    // Personal-only: instant LinkedIn products (Sign In with OIDC + Share on LinkedIn).
+    // Org scopes (r_basicprofile / *_organization_*) require the Community Management API review.
     'openid',
     'profile',
     'w_member_social',
-    'r_basicprofile',
-    'rw_organization_admin',
-    'w_organization_social',
-    'r_organization_social',
   ];
   override maxConcurrentJob = 2; // LinkedIn has professional posting limits
   refreshWait = true;
@@ -142,7 +140,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       expiresIn: expires_in,
       name,
       picture: picture || '',
-      username: vanityName,
+      username: vanityName || '',
     };
   }
 
@@ -222,7 +220,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       expiresIn,
       name,
       picture,
-      username: vanityName,
+      username: vanityName || '',
     };
   }
 
