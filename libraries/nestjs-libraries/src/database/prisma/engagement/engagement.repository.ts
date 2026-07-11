@@ -114,7 +114,7 @@ export class EngagementRepository {
     });
   }
 
-  listContentIdeas(orgId: string, limit = 50) {
+  listContentIdeas(orgId: string, limit = 500) {
     return this._prisma.model.contentIdea.findMany({
       where: { organizationId: orgId, deletedAt: null },
       orderBy: { createdAt: 'desc' },

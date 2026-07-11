@@ -251,7 +251,7 @@ export class EngagementService {
     });
   }
 
-  listContentIdeas(orgId: string, limit = 50) {
+  listContentIdeas(orgId: string, limit = 500) {
     return this._repo.listContentIdeas(orgId, limit);
   }
 
