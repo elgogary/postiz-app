@@ -1,6 +1,7 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { MediaRepository } from '@gitroom/nestjs-libraries/database/prisma/media/media.repository';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
+import { FalService } from '@gitroom/nestjs-libraries/openai/fal.service';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { Organization } from '@prisma/client';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
@@ -21,7 +22,8 @@ export class MediaService {
     private _mediaRepository: MediaRepository,
     private _openAi: OpenaiService,
     private _subscriptionService: SubscriptionService,
-    private _videoManager: VideoManager
+    private _videoManager: VideoManager,
+    private _falService: FalService
   ) {}
 
   async deleteMedia(org: string, id: string) {
@@ -41,6 +43,17 @@ export class MediaService {
       org,
       'ai_images',
       async () => {
+        // Fal.ai path (cheap; the model expands the prompt itself). Download the URL and return
+        // base64 so the controller data-URI + uploadSimple + saveFile pipeline works unchanged.
+        if (process.env.FAL_KEY) {
+          const falUrl = await this._falService.generateImageFromText(
+            process.env.FAL_IMAGE_MODEL || 'flux/schnell',
+            prompt
+          );
+          return Buffer.from(
+            await (await fetch(falUrl)).arrayBuffer()
+          ).toString('base64');
+        }
         if (generatePromptFirst) {
           prompt = await this._openAi.generatePromptForPicture(prompt);
           console.log('Prompt:', prompt);

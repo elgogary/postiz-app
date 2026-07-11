@@ -7,6 +7,10 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MenuItem } from '@gitroom/frontend/components/new-layout/menu-item';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { AgentMediaModal } from '@gitroom/frontend/components/layout/agent.media.modal';
+// >>> SANAD (Design Media sidebar)
+import { AiImageModal } from '@gitroom/frontend/components/launches/ai.image';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+// <<< SANAD
 
 interface MenuItemInterface {
   name: string;
@@ -22,6 +26,28 @@ export const useMenuItem = () => {
   const { isGeneral } = useVariables();
   const t = useT();
   const { openModal } = useModals();
+  // >>> SANAD (Design Media sidebar): reuse the AI image generator, saved straight to Media library
+  const toaster = useToaster();
+  const handleDesignMediaClick = useCallback(() => {
+    openModal({
+      title: t('design_media', 'Design Media'),
+      closeOnClickOutside: true,
+      closeOnEscape: true,
+      children: (close: () => void) => (
+        <AiImageModal
+          close={close}
+          setLoading={() => {}}
+          onChange={() =>
+            toaster.show(
+              t('saved_to_media', 'Saved to your Media library'),
+              'success'
+            )
+          }
+        />
+      ),
+    });
+  }, [openModal, t, toaster]);
+  // <<< SANAD
 
   const handleAgentMediaClick = useCallback(() => {
     openModal({
@@ -182,6 +208,31 @@ export const useMenuItem = () => {
   ] satisfies MenuItemInterface[] as MenuItemInterface[];
 
   const secondMenu = [
+    // >>> SANAD (Design Media)
+    {
+      name: t('design_media', 'Design Media'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="9" cy="9" r="2" />
+          <path d="m21 15-3.5-3.5a2 2 0 0 0-2.8 0L6 20" />
+        </svg>
+      ),
+      path: '#',
+      role: ['ADMIN', 'SUPERADMIN', 'USER'],
+      onClick: handleDesignMediaClick,
+    },
+    // <<< SANAD
     {
       name: t('UGC', 'UGC'),
       icon: (
