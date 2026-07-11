@@ -21,6 +21,10 @@ export class AddContentIdeaTool implements AgentToolInterface {
           .string()
           .optional()
           .describe('Optional source, e.g. a URL or where it came from'),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe('Optional tags/categories for the idea'),
       }),
       mcp: {
         annotations: {
@@ -45,7 +49,8 @@ export class AddContentIdeaTool implements AgentToolInterface {
           organizationId,
           inputData.idea,
           inputData.note,
-          inputData.source
+          inputData.source,
+          inputData.tags
         );
         return {
           id: saved.id,

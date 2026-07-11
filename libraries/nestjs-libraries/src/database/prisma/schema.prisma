@@ -1025,6 +1025,7 @@ model ContentIdea {
   idea           String
   note           String?
   source         String?
+  tags           String[]  @default([])
   createdAt      DateTime  @default(now())
   deletedAt      DateTime?
 

@@ -237,12 +237,18 @@ export class EngagementService {
     orgId: string,
     idea: string,
     note?: string,
-    source?: string
+    source?: string,
+    tags?: string[]
   ) {
     if (!idea || !idea.trim()) {
       throw new BadRequestException('Idea text is required');
     }
-    return this._repo.addContentIdea(orgId, { idea: idea.trim(), note, source });
+    return this._repo.addContentIdea(orgId, {
+      idea: idea.trim(),
+      note,
+      source,
+      tags,
+    });
   }
 
   listContentIdeas(orgId: string, limit = 50) {

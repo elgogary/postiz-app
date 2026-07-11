@@ -101,7 +101,7 @@ export class EngagementRepository {
   // >>> SANAD-ENGAGEMENT (content ideas)
   addContentIdea(
     orgId: string,
-    data: { idea: string; note?: string; source?: string }
+    data: { idea: string; note?: string; source?: string; tags?: string[] }
   ) {
     return this._prisma.model.contentIdea.create({
       data: {
@@ -109,6 +109,7 @@ export class EngagementRepository {
         idea: data.idea,
         note: data.note,
         source: data.source,
+        tags: data.tags || [],
       },
     });
   }

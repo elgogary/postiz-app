@@ -71,13 +71,15 @@ export class EngagementController {
   @Post('/content-ideas')
   createContentIdea(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { idea: string; note?: string; source?: string }
+    @Body()
+    body: { idea: string; note?: string; source?: string; tags?: string[] }
   ) {
     return this._engagementService.addContentIdea(
       org.id,
       body.idea,
       body.note,
-      body.source
+      body.source,
+      body.tags
     );
   }
 

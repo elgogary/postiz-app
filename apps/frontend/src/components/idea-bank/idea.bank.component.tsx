@@ -1,17 +1,19 @@
-"use client";
+'use client';
 
-import { FC, useCallback, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Button } from '@gitroom/react/form/button';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+import clsx from 'clsx';
 
 interface Idea {
   id: string;
   idea: string;
   note?: string | null;
   source?: string | null;
+  tags?: string[];
   createdAt: string;
 }
 
@@ -21,6 +23,8 @@ export const IdeaBank: FC = () => {
   const toaster = useToaster();
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [text, setText] = useState('');
+  const [tagsText, setTagsText] = useState('');
+  const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -38,6 +42,18 @@ export const IdeaBank: FC = () => {
     load();
   }, [load]);
 
+  const allTags = useMemo(() => {
+    const s = new Set<string>();
+    ideas.forEach((i) => (i.tags || []).forEach((tg) => s.add(tg)));
+    return Array.from(s).sort();
+  }, [ideas]);
+
+  const shown = useMemo(
+    () =>
+      filter ? ideas.filter((i) => (i.tags || []).includes(filter)) : ideas,
+    [ideas, filter]
+  );
+
   const add = useCallback(async () => {
     if (!text.trim()) {
       toaster.show(t('type_an_idea', 'Type an idea'), 'warning');
@@ -45,18 +61,23 @@ export const IdeaBank: FC = () => {
     }
     setBusy(true);
     try {
+      const tags = tagsText
+        .split(',')
+        .map((x) => x.trim())
+        .filter(Boolean);
       await fetch('/engagement/content-ideas', {
         method: 'POST',
-        body: JSON.stringify({ idea: text.trim(), source: 'ui' }),
+        body: JSON.stringify({ idea: text.trim(), tags, source: 'ui' }),
       });
       setText('');
+      setTagsText('');
       await load();
       toaster.show(t('idea_saved', 'Idea saved'), 'success');
     } catch (e) {
       toaster.show(t('could_not_save', 'Could not save'), 'warning');
     }
     setBusy(false);
-  }, [text, fetch, load, t, toaster]);
+  }, [text, tagsText, fetch, load, t, toaster]);
 
   const remove = useCallback(
     async (id: string) => {
@@ -66,6 +87,20 @@ export const IdeaBank: FC = () => {
       }
     },
     [fetch, load, t]
+  );
+
+  const chip = (label: string, active: boolean, onClick: () => void) => (
+    <div
+      onClick={onClick}
+      className={clsx(
+        'cursor-pointer rounded-[4px] px-[10px] h-[26px] flex items-center text-[12px] border',
+        active
+          ? 'bg-[#612BD3] border-[#612BD3] text-white'
+          : 'bg-newColColor border-newBgLineColor'
+      )}
+    >
+      {label}
+    </div>
   );
 
   return (
@@ -82,37 +117,68 @@ export const IdeaBank: FC = () => {
         </div>
       </div>
 
-      <div className="flex gap-[8px] items-center">
+      <div className="flex flex-col gap-[8px]">
+        <div className="flex gap-[8px] items-center">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                add();
+              }
+            }}
+            placeholder={t('idea_placeholder', 'A post idea, angle, or hook...')}
+            className="flex-1 bg-input border border-fifth rounded-[4px] p-[10px] text-[14px] outline-none"
+          />
+          <Button onClick={add} disabled={busy}>
+            {t('add', 'Add')}
+          </Button>
+        </div>
         <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              add();
-            }
-          }}
-          placeholder={t('idea_placeholder', 'A post idea, angle, or hook...')}
-          className="flex-1 bg-input border border-fifth rounded-[4px] p-[10px] text-[14px] outline-none"
+          value={tagsText}
+          onChange={(e) => setTagsText(e.target.value)}
+          placeholder={t('tags_placeholder', 'Tags, comma separated (optional)')}
+          className="bg-input border border-fifth rounded-[4px] p-[8px] text-[12px] outline-none"
         />
-        <Button onClick={add} disabled={busy}>
-          {t('add', 'Add')}
-        </Button>
       </div>
 
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-[6px] items-center">
+          {chip(t('all', 'All'), filter === '', () => setFilter(''))}
+          {allTags.map((tg) =>
+            chip(tg, filter === tg, () => setFilter(filter === tg ? '' : tg))
+          )}
+        </div>
+      )}
+
       <div className="text-[12px] text-customColor18">
-        {ideas.length} {t('ideas', 'ideas')}
+        {shown.length} {t('ideas', 'ideas')}
+        {filter ? ' - ' + filter : ''}
       </div>
 
       <div className="flex flex-col gap-[8px]">
-        {ideas.map((i) => (
+        {shown.map((i) => (
           <div
             key={i.id}
             className="bg-sixth border border-fifth rounded-[4px] p-[12px] flex items-start gap-[10px]"
           >
-            <div className="flex-1 flex flex-col gap-[4px]">
+            <div className="flex-1 flex flex-col gap-[6px]">
               <div className="text-[14px] whitespace-pre-wrap">{i.idea}</div>
               {i.note && (
                 <div className="text-[12px] text-customColor18">{i.note}</div>
+              )}
+              {i.tags && i.tags.length > 0 && (
+                <div className="flex flex-wrap gap-[6px]">
+                  {i.tags.map((tg) => (
+                    <div
+                      key={tg}
+                      onClick={() => setFilter(tg)}
+                      className="cursor-pointer text-[11px] px-[8px] py-[2px] rounded-[4px] bg-forth text-white"
+                    >
+                      {tg}
+                    </div>
+                  ))}
+                </div>
               )}
               <div className="text-[11px] text-customColor18">
                 {new Date(i.createdAt).toLocaleDateString()}
@@ -127,7 +193,7 @@ export const IdeaBank: FC = () => {
             </div>
           </div>
         ))}
-        {ideas.length === 0 && (
+        {shown.length === 0 && (
           <div className="text-[13px] text-customColor18">
             {t(
               'no_ideas',
