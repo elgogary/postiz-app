@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Agent } from '@mastra/core/agent';
-import { openai } from '@ai-sdk/openai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { Memory } from '@mastra/memory';
 import { pStore } from '@gitroom/nestjs-libraries/chat/mastra.store';
 import { array, object, string } from 'zod';
@@ -87,7 +87,13 @@ export class LoadToolsService {
       )}
 `;
       },
-      model: openai.chat(process.env.AGENT_AI_MODEL || 'deepseek-chat'),
+      // DeepSeek is OpenAI-compatible but rejects the 'developer' role that
+      // @ai-sdk/openai emits; the openai-compatible provider uses 'system'.
+      model: createOpenAICompatible({
+        name: 'deepseek',
+        baseURL: process.env.OPENAI_BASE_URL || 'https://api.deepseek.com',
+        apiKey: process.env.OPENAI_API_KEY || '',
+      })(process.env.AGENT_AI_MODEL || 'deepseek-chat'),
       tools,
       memory: new Memory({
         storage: pStore,
