@@ -128,6 +128,21 @@ export class EngagementRepository {
       data: { deletedAt: new Date() },
     });
   }
+
+  updateContentIdea(
+    orgId: string,
+    id: string,
+    data: { idea?: string; note?: string; tags?: string[] }
+  ) {
+    return this._prisma.model.contentIdea.updateMany({
+      where: { id, organizationId: orgId },
+      data: {
+        ...(data.idea !== undefined ? { idea: data.idea } : {}),
+        ...(data.note !== undefined ? { note: data.note } : {}),
+        ...(data.tags !== undefined ? { tags: data.tags } : {}),
+      },
+    });
+  }
   // <<< SANAD-ENGAGEMENT
 
   getQueue(orgId: string, status?: string) {

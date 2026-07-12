@@ -258,6 +258,22 @@ export class EngagementService {
   deleteContentIdea(orgId: string, id: string) {
     return this._repo.deleteContentIdea(orgId, id);
   }
+
+  updateContentIdea(
+    orgId: string,
+    id: string,
+    data: { idea?: string; note?: string; tags?: string[] }
+  ) {
+    return this._repo.updateContentIdea(orgId, id, data);
+  }
+
+  async refineContentIdea(idea: string) {
+    if (!idea || !idea.trim()) {
+      throw new BadRequestException('Idea text is required');
+    }
+    const refined = await this._openai.refineContentIdea(idea, DEFAULT_VOICE);
+    return { refined };
+  }
   // <<< SANAD-ENGAGEMENT
 
   // Manual paste path: the human supplies the post text they are already looking at.

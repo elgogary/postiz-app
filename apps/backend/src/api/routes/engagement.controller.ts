@@ -90,6 +90,23 @@ export class EngagementController {
   ) {
     return this._engagementService.deleteContentIdea(org.id, id);
   }
+
+  @Put('/content-ideas/:id')
+  updateContentIdea(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: { idea?: string; note?: string; tags?: string[] }
+  ) {
+    return this._engagementService.updateContentIdea(org.id, id, body);
+  }
+
+  @Post('/content-ideas/refine')
+  refineContentIdea(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: { idea: string }
+  ) {
+    return this._engagementService.refineContentIdea(body.idea);
+  }
   // <<< SANAD-ENGAGEMENT (idea bank UI)
 
   @Get('/queue')

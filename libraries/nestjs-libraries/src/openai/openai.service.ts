@@ -108,6 +108,27 @@ export class OpenaiService {
   }
   // <<< SANAD-ENGAGEMENT
 
+  async refineContentIdea(idea: string, brandVoice: string) {
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === 'sk-proj-'
+    ) {
+      return idea;
+    }
+    const res = await openai.chat.completions.create({
+      model: process.env.ENGAGEMENT_AI_MODEL || 'gpt-4.1',
+      temperature: 0.7,
+      messages: [
+        {
+          role: 'system',
+          content: `You sharpen LinkedIn content ideas for this person: ${brandVoice}. Rewrite the idea into a crisper post angle: one concrete principle plus a hook line, specific not generic. Keep it under 300 characters. Same language as the input. Output only the refined idea, no preamble, no quotes.`,
+        },
+        { role: 'user', content: idea },
+      ],
+    });
+    return (res.choices?.[0]?.message?.content || '').trim() || idea;
+  }
+
   async generatePosts(content: string) {
     const posts = (
       await Promise.all([
