@@ -121,7 +121,7 @@ export class OpenaiService {
       messages: [
         {
           role: 'system',
-          content: `You sharpen LinkedIn content ideas for this person: ${brandVoice}. Rewrite the idea into a crisper post angle: one concrete principle plus a hook line, specific not generic. Keep it under 300 characters. Same language as the input. Output only the refined idea, no preamble, no quotes.`,
+          content: `You turn a raw idea into a STRUCTURED LinkedIn content idea for this person: ${brandVoice}. Niche: ERP, AI adoption and digital transformation only. Reframe the technical detail into the business owner's pain or insight, not the code detail. Rules: no em-dashes, no AI-tells, no generic hype, human voice. Output EXACTLY these labeled lines and nothing else, same language as the input:\nHook: a scroll-stopping first line, curiosity-gap or contrarian, NEVER a question\nAngle: one line, the owner-facing pain or insight this post makes\nBullets:\n- specific point\n- specific point\n- specific point`,
         },
         { role: 'user', content: idea },
       ],
