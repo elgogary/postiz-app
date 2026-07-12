@@ -18,6 +18,60 @@ interface Idea {
   createdAt: string;
 }
 
+// Render a saved idea nicely: bold Hook, muted Angle, real bullets. Plain ideas stay as paragraphs.
+const renderIdea = (text: string) => {
+  const lines = (text || '').split('\n');
+  const els: any[] = [];
+  let bullets: string[] = [];
+  const flush = (k: string) => {
+    if (bullets.length) {
+      els.push(
+        <ul key={k} className="list-disc ps-[18px] flex flex-col gap-[3px]">
+          {bullets.map((b, bi) => (
+            <li key={bi} className="text-[13px]">
+              {b}
+            </li>
+          ))}
+        </ul>
+      );
+      bullets = [];
+    }
+  };
+  lines.forEach((ln, i) => {
+    const l = ln.trim();
+    if (/^hook\s*:/i.test(l)) {
+      flush('u' + i);
+      els.push(
+        <div key={i} className="text-[15px] font-[600] leading-[1.35]">
+          {l.replace(/^hook\s*:\s*/i, '')}
+        </div>
+      );
+    } else if (/^angle\s*:/i.test(l)) {
+      flush('u' + i);
+      els.push(
+        <div key={i} className="text-[13px] text-customColor18">
+          {l.replace(/^angle\s*:\s*/i, '')}
+        </div>
+      );
+    } else if (/^bullets?\s*:/i.test(l)) {
+      flush('u' + i);
+      const rest = l.replace(/^bullets?\s*:\s*/i, '');
+      if (rest) bullets.push(rest);
+    } else if (/^[-*•]\s+/.test(l)) {
+      bullets.push(l.replace(/^[-*•]\s+/, ''));
+    } else if (l) {
+      flush('u' + i);
+      els.push(
+        <div key={i} className="text-[14px] whitespace-pre-wrap leading-[1.4]">
+          {ln}
+        </div>
+      );
+    }
+  });
+  flush('uend');
+  return <div className="flex flex-col gap-[6px]">{els}</div>;
+};
+
 const EditModal: FC<{
   idea: Idea;
   close: () => void;
@@ -32,9 +86,7 @@ const EditModal: FC<{
   const [refining, setRefining] = useState(false);
 
   const refine = useCallback(async () => {
-    if (!text.trim()) {
-      return;
-    }
+    if (!text.trim()) return;
     setRefining(true);
     try {
       const res = await (
@@ -56,10 +108,7 @@ const EditModal: FC<{
   const save = useCallback(async () => {
     setBusy(true);
     try {
-      const tags = tagsText
-        .split(',')
-        .map((x) => x.trim())
-        .filter(Boolean);
+      const tags = tagsText.split(',').map((x) => x.trim()).filter(Boolean);
       await fetch(`/engagement/content-ideas/${idea.id}`, {
         method: 'PUT',
         body: JSON.stringify({ idea: text.trim(), tags }),
@@ -74,11 +123,11 @@ const EditModal: FC<{
   }, [text, tagsText, idea.id, fetch, onSaved, close, t, toaster]);
 
   return (
-    <div className="flex flex-col gap-[12px] min-w-[440px]">
+    <div className="flex flex-col gap-[12px] w-[600px] max-w-full">
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="min-h-[150px] bg-input border border-fifth rounded-[4px] p-[10px] text-[14px] outline-none"
+        className="min-h-[220px] bg-input border border-fifth rounded-[4px] p-[12px] text-[14px] outline-none leading-[1.5]"
       />
       <input
         value={tagsText}
@@ -113,9 +162,7 @@ export const IdeaBank: FC = () => {
   const load = useCallback(async () => {
     try {
       const res = await (await fetch('/engagement/content-ideas')).json();
-      if (Array.isArray(res)) {
-        setIdeas(res);
-      }
+      if (Array.isArray(res)) setIdeas(res);
     } catch (e) {
       /* ignore */
     }
@@ -143,10 +190,7 @@ export const IdeaBank: FC = () => {
     }
     setBusy(true);
     try {
-      const tags = tagsText
-        .split(',')
-        .map((x) => x.trim())
-        .filter(Boolean);
+      const tags = tagsText.split(',').map((x) => x.trim()).filter(Boolean);
       await fetch('/engagement/content-ideas', {
         method: 'POST',
         body: JSON.stringify({ idea: text.trim(), tags, source: 'ui' }),
@@ -204,23 +248,21 @@ export const IdeaBank: FC = () => {
         <div className="text-[20px] font-[600]">
           {t('idea_bank', 'Idea Bank')}
         </div>
-        <div className="text-[13px] text-customColor18 max-w-[640px]">
+        <div className="text-[13px] text-customColor18 max-w-[720px]">
           {t(
             'idea_bank_desc',
-            'Content ideas for your LinkedIn brand. Add, edit, or refine with AI. You can also tell Claude "add this to my idea bank" through the Postiz connector.'
+            'Each idea is a ready-to-write post: a Hook (the first line that stops the scroll), an Angle (the point), and Bullets (what to say). Pick one, open Edit to tweak or Refine with AI, then write a short post from it.'
           )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-[8px]">
+      <div className="flex flex-col gap-[8px] max-w-[720px]">
         <div className="flex gap-[8px] items-center">
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                add();
-              }
+              if (e.key === 'Enter') add();
             }}
             placeholder={t('idea_placeholder', 'A post idea, angle, or hook...')}
             className="flex-1 bg-input border border-fifth rounded-[4px] p-[10px] text-[14px] outline-none"
@@ -251,15 +293,13 @@ export const IdeaBank: FC = () => {
         {filter ? ' - ' + filter : ''}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[12px]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
         {shown.map((i) => (
           <div
             key={i.id}
-            className="bg-sixth border border-fifth rounded-[6px] p-[14px] flex flex-col gap-[8px]"
+            className="bg-sixth border border-fifth rounded-[6px] p-[16px] flex flex-col gap-[10px]"
           >
-            <div className="text-[14px] whitespace-pre-wrap flex-1">
-              {i.idea}
-            </div>
+            {renderIdea(i.idea)}
             {i.note && (
               <div className="text-[12px] text-customColor18">{i.note}</div>
             )}
@@ -283,13 +323,13 @@ export const IdeaBank: FC = () => {
               </div>
               <div
                 onClick={() => edit(i)}
-                className="text-[11px] text-[#0A66C2] cursor-pointer"
+                className="text-[12px] text-[#0A66C2] cursor-pointer"
               >
-                {t('edit', 'Edit')}
+                {t('edit_refine', 'Edit / Refine')}
               </div>
               <div
                 onClick={() => remove(i.id)}
-                className="text-[11px] text-customColor18 cursor-pointer hover:text-red-400"
+                className="text-[12px] text-customColor18 cursor-pointer hover:text-red-400"
               >
                 {t('delete', 'Delete')}
               </div>
@@ -300,10 +340,7 @@ export const IdeaBank: FC = () => {
 
       {shown.length === 0 && (
         <div className="text-[13px] text-customColor18">
-          {t(
-            'no_ideas',
-            'No ideas yet. Add one above, or tell Claude "add this to my idea bank".'
-          )}
+          {t('no_ideas', 'No ideas yet. Add one above.')}
         </div>
       )}
     </div>
