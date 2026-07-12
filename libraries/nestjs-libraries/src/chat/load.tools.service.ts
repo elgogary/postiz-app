@@ -87,7 +87,7 @@ export class LoadToolsService {
       )}
 `;
       },
-      model: openai('gpt-5.2'),
+      model: openai.chat(process.env.AGENT_AI_MODEL || 'deepseek-chat'),
       tools,
       memory: new Memory({
         storage: pStore,
