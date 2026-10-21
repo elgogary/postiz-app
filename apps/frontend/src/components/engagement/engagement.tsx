@@ -152,6 +152,16 @@ const DraftCard: FC<{ draft: any; reload: () => void }> = ({ draft, reload }) =>
     <div className="bg-sixth border border-fifth rounded-[4px] p-[16px] flex flex-col gap-[10px]">
       <div className="flex items-center gap-[10px]">
         <div className="font-[600]">{draft?.target?.name || t('target', 'Target')}</div>
+        {draft.postUrl?.startsWith('https://') && (
+          <a
+            href={draft.postUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[13px] font-[600] text-btnPrimary underline hover:opacity-80"
+          >
+            {t('open_post', 'Open post')} ↗
+          </a>
+        )}
         <div className="text-customColor18 text-[12px] flex-1 truncate">
           {draft?.target?.headline || ''}
         </div>
