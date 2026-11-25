@@ -105,7 +105,11 @@ export const MyLinkedin: FC = () => {
     }
     setUrl(start);
     runAnalyze(start);
-  }, [runAnalyze]);
+    // Mount only: runAnalyze changes identity every render (useToaster returns a new object), so
+    // depending on it re-ran this effect after every render: an endless loop that blocked navigation
+    // and, with no saved pull, called the paid scraper on every pass.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stat = (label: string, value: number, color: string) => (
     <div className="flex-1 min-w-[140px] bg-sixth border border-fifth rounded-[4px] p-[16px] flex flex-col gap-[6px]">
