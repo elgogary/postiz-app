@@ -254,7 +254,11 @@ export class LinkedinPageProvider
     ).json();
 
     return {
-      id: id,
+      // >>> SANAD: the bare member id is the personal `linkedin` channel's internalId, so the
+      // page-picker row would overwrite it and share one root (and token) with it. Own prefix =
+      // own root: page tokens and personal tokens never replace each other.
+      id: `linkedin-page-${id}`,
+      // <<< SANAD
       accessToken,
       refreshToken,
       expiresIn,

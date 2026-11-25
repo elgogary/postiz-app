@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 // >>> SANAD-ENGAGEMENT (auto-pull cron)
 import { ScheduleModule } from '@nestjs/schedule';
 import { EngagementCronService } from '@gitroom/backend/services/engagement.cron.service';
+import { ChannelProfileSyncService } from '@gitroom/backend/services/channel.profile.sync.service';
 // <<< SANAD-ENGAGEMENT
 import { AuthController } from '@gitroom/backend/api/routes/auth.controller';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
@@ -109,6 +110,7 @@ const authenticatedController = [
     // >>> SANAD-ENGAGEMENT
     EngagementCronService,
     // <<< SANAD-ENGAGEMENT
+    ChannelProfileSyncService,
   ],
   get exports() {
     return [...this.imports, ...this.providers];
