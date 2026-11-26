@@ -24,6 +24,7 @@ function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: 
   };
   const repo = {
     list: async () => rows,
+    unmigrated: async () => rows.filter((r) => !r.hook),
     idea: async (_o: string, id: string) => rows.find((r) => r.id === id) || null,
     create: async (data: Record<string, unknown>) => { calls.push(['create', data]); return { ...ideaRow(), ...data, id: 'new' }; },
     update: async (_o: string, id: string, data: Record<string, unknown>) => { calls.push(['update', id, data]); return { ...rows.find((r) => r.id === id), ...data }; },

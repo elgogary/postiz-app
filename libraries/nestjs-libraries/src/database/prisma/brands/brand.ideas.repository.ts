@@ -3,14 +3,22 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 
+export const LIST_CAP = 1000;
+
 @Injectable()
 export class BrandIdeasRepository {
   constructor(private _prisma: PrismaRepository<'contentIdea' | 'postBrief' | 'post' | '$transaction'>) {}
 
+  // The page shows the newest LIST_CAP ideas; one more is read so the page can say there are more.
   list(orgId: string) {
     return this._prisma.model.contentIdea.findMany({
-      where: { organizationId: orgId, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: 1000,
+      where: { organizationId: orgId, deletedAt: null }, orderBy: { createdAt: 'desc' }, take: LIST_CAP + 1,
     });
+  }
+
+  // Every idea not yet split into fields, with no cap, so a migration never skips the older ones.
+  unmigrated(orgId: string) {
+    return this._prisma.model.contentIdea.findMany({ where: { organizationId: orgId, deletedAt: null, hook: '' } });
   }
 
   idea(orgId: string, id: string) {

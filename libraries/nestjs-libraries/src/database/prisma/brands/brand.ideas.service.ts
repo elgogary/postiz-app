@@ -3,7 +3,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ContentIdea } from '@prisma/client';
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
-import { BrandIdeasRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.ideas.repository';
+import { BrandIdeasRepository, LIST_CAP } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.ideas.repository';
 import { BrandPostsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.posts.repository';
 import { BrandReviewService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.review.service';
 import { BrandDraftService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.draft.service';
@@ -61,13 +61,15 @@ export class BrandIdeasService {
   async list(orgId: string, userId: string, orgRole: OrgRole, scope: string) {
     const brands = await this.brandsOf(orgId, userId, orgRole);
     if (scope !== 'all' && scope !== 'none' && !brands.some((b) => b.id === scope)) throw new NotFoundException('Brand not found');
-    const rows = await this._repo.list(orgId);
+    const read = await this._repo.list(orgId);
+    const more = read.length > LIST_CAP;
+    const rows = read.slice(0, LIST_CAP);
     const plans = await this._repo.plans(orgId, rows.map((r) => r.briefId).filter((x): x is string => !!x));
     const planOf = new Map(plans.map((p) => [p.briefId, p]));
     const ideas = rows.map((r) => ideaView(asRow(r), r.briefId ? planOf.get(r.briefId) || null : null))
       .filter((v) => (scope === 'all' ? true : scope === 'none' ? v.brandIds.length === 0 : v.brandIds.includes(scope)));
     const pillars = await this._brands.pillarsByBrand(orgId);
-    return { brands: brands.map((b) => ({ id: b.id, name: b.name, role: b.role, pillars: pillars[b.id] || [] })), topics: [...TOPICS], ideas };
+    return { brands: brands.map((b) => ({ id: b.id, name: b.name, role: b.role, pillars: pillars[b.id] || [] })), topics: [...TOPICS], ideas, more };
   }
 
   async create(orgId: string, userId: string, orgRole: OrgRole, dto: IdeaDto) {
@@ -110,7 +112,7 @@ export class BrandIdeasService {
     if (!isOrgAdmin(orgRole)) throw new ForbiddenException('Only an admin can move the ideas');
     const brands = await this.brandsOf(orgId, userId, orgRole);
     const tagMap = Object.fromEntries(Object.entries(dto.tagMap || {}).filter(([, id]) => brands.some((b) => b.id === id)));
-    const rows = (await this._repo.list(orgId)).filter((r) => !r.hook);
+    const rows = await this._repo.unmigrated(orgId);
     const byBrand: Record<string, number> = {};
     const byTopic: Record<string, number> = {};
     let split = 0;
