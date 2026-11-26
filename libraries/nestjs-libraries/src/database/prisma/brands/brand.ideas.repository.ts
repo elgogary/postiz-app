@@ -34,6 +34,14 @@ export class BrandIdeasRepository {
     return this.idea(orgId, id);
   }
 
+  // Marks a new idea Planned only if it is still new, so two clicks on Plan it make one planned post.
+  async claim(orgId: string, id: string) {
+    const r = await this._prisma.model.contentIdea.updateMany({
+      where: { id, organizationId: orgId, deletedAt: null, status: 'NEW', briefId: null }, data: { status: 'PLANNED' },
+    });
+    return r.count === 1;
+  }
+
   updateOp(orgId: string, id: string, data: Prisma.ContentIdeaUncheckedUpdateManyInput) {
     return this._prisma.model.contentIdea.updateMany({ where: { id, organizationId: orgId, deletedAt: null }, data });
   }

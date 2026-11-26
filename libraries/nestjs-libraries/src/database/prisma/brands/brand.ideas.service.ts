@@ -136,8 +136,50 @@ export class BrandIdeasService {
     return { dryRun: false, ...summary };
   }
 
+  // The idea is marked Planned as soon as its brief exists, so a later failure (the draft) never leaves a planned
+  // post behind an idea that still reads New.
   async plan(orgId: string, userId: string, orgRole: OrgRole, id: string, dto: PlanIdeaDto) {
-    throw new BadRequestException('Plan it comes with Task 4');
+    const ctx = await this._brands.context(orgId, userId, orgRole, dto.customerId);
+    if (!canEdit(ctx.role)) throw new ForbiddenException('You can view this brand but not plan posts');
+    const row = await this._repo.idea(orgId, id);
+    if (!row) throw new NotFoundException('Idea not found');
+    const idea = await this.view(orgId, row);
+    if (idea.status !== 'NEW') throw new BadRequestException('Only a new idea can be planned');
+    if (idea.brandIds.length && !idea.brandIds.includes(dto.customerId)) throw new BadRequestException('This idea is not for this brand');
+    const when = Date.parse(dto.date);
+    if (Number.isNaN(when)) throw new BadRequestException('Pick the date');
+    if (when < Date.now()) throw new BadRequestException('Pick a date that has not passed');
+    if (!(await this._repo.claim(orgId, id))) throw new BadRequestException('This idea was planned a moment ago');
+    let brief: { id: string };
+    try {
+      brief = await this._posts.createBrief({
+        orgId, customerId: dto.customerId, ideaId: id, plannedAt: new Date(when), format: dto.format, title: idea.hook,
+        sub: idea.angle, slides: idea.bullets, pillars: idea.pillars,
+      });
+    } catch (e) {
+      await this._repo.update(orgId, id, { status: 'NEW' });
+      throw e;
+    }
+    await this._repo.update(orgId, id, {
+      briefId: brief.id,
+      brandIds: idea.brandIds.includes(dto.customerId) ? idea.brandIds : [...idea.brandIds, dto.customerId],
+    });
+    let firstDraft = false;
+    if (dto.ai) {
+      const book = await this._brands.get(orgId, userId, orgRole, dto.customerId);
+      const checks = ((book.sections.review?.rows as string[][] | null) || []).map((r) => (r[0] || '').trim()).filter(Boolean);
+      const draft = await this._drafts.write({
+        brand: ctx.customer.name, voice: book.sections.voice?.content || '', checks, idea, format: dto.format,
+      });
+      if (draft) {
+        await this._posts.updateBrief(brief.id, {
+          caption: draft.caption, slides: draft.slides, slidesLabel: draft.slidesLabel, verify: DRAFT_VERIFY, firstDraft: true,
+        });
+        await this._review.createDraft(orgId, userId, orgRole, dto.customerId, brief.id, { date: dto.date });
+        firstDraft = true;
+      }
+    }
+    return { briefId: brief.id, firstDraft, aiFailed: dto.ai && !firstDraft };
   }
 }
 // <<< SANAD-BRANDS

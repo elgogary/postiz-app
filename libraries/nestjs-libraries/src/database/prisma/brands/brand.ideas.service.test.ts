@@ -10,7 +10,7 @@ const ideaRow = (over: Record<string, unknown> = {}) => ({
   deletedAt: null, hook: '', angle: '', bullets: [], brandIds: ['acc'], topic: '', pillars: [], format: '', status: 'NEW', briefId: null, ...over,
 });
 
-function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: unknown; orgRole?: string } = {}) {
+function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: unknown; orgRole?: string; claimed?: boolean } = {}) {
   const calls: unknown[][] = [];
   const rows = opts.rows || [ideaRow()];
   const brands = {
@@ -28,6 +28,7 @@ function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: 
     idea: async (_o: string, id: string) => rows.find((r) => r.id === id) || null,
     create: async (data: Record<string, unknown>) => { calls.push(['create', data]); return { ...ideaRow(), ...data, id: 'new' }; },
     update: async (_o: string, id: string, data: Record<string, unknown>) => { calls.push(['update', id, data]); return { ...rows.find((r) => r.id === id), ...data }; },
+    claim: async (_o: string, id: string) => { calls.push(['claim', id]); return opts.claimed !== false; },
     updateOp: (_o: string, id: string, data: Record<string, unknown>) => { calls.push(['updateOp', id, data]); return {}; },
     saveAll: async (ops: unknown[]) => { calls.push(['saveAll', ops.length]); return []; },
     plans: async () => [{ briefId: 'b9', brandId: 'acc', date: FUTURE, postId: 'p9', postState: 'PUBLISHED' }],
@@ -95,10 +96,14 @@ test('plan it: AI on writes a first draft; AI failing still plans; only a new id
   const s = setup();
   const res = await s.svc.plan(...s.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Carousel', ai: true });
   assert.deepEqual(res, { briefId: 'bNew', firstDraft: true, aiFailed: false });
-  assert.equal((s.calls[0][1] as { ideaId: string }).ideaId, 'i1');
-  assert.equal((s.calls[1][2] as { firstDraft: boolean }).firstDraft, true);
-  assert.equal(s.calls[2][0], 'createDraft');
-  assert.deepEqual((s.calls[3][2] as { status: string; briefId: string }).status, 'PLANNED');
+  assert.deepEqual(s.calls.map((c) => c[0]), ['claim', 'createBrief', 'update', 'updateBrief', 'createDraft']);
+  assert.equal((s.calls[1][1] as { ideaId: string }).ideaId, 'i1');
+  assert.deepEqual(s.calls[2][2], { briefId: 'bNew', brandIds: ['acc'] });
+  assert.equal((s.calls[3][2] as { firstDraft: boolean }).firstDraft, true);
+  await assert.rejects(setup().svc.plan(...s.args, 'i1', { customerId: 'acc', date: '2020-01-01T00:00:00Z', format: 'Text', ai: false }), BadRequestException);
+  const lost = setup({ claimed: false });
+  await assert.rejects(lost.svc.plan(...lost.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: false }), BadRequestException);
+  assert.ok(!lost.calls.some((c) => c[0] === 'createBrief'));
   const failed = setup({ draft: null });
   assert.deepEqual(await failed.svc.plan(...failed.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true }), { briefId: 'bNew', firstDraft: false, aiFailed: true });
   assert.ok(!failed.calls.some((c) => c[0] === 'createDraft'));
