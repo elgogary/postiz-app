@@ -2,7 +2,8 @@
 // >>> SANAD-BRANDS: one brand-book text section. The read view takes ONE direction from the whole section's text, so
 // every line of an Arabic section starts on the right, its English headings too (per-block directions made short
 // English lines jump to the left edge). A block keeps its own direction only when it is a full paragraph (12+ words)
-// in the other language. Hashtags and @mentions are left-to-right islands, and "Name #HEX" lines become colour chips.
+// in the other language (a whole list, never one item, so the bullets keep their side). Latin hashtags and @mentions
+// are left-to-right islands, and "Name #HEX" lines become colour chips.
 // All of it is written into the HTML string (memoized): React 19 re-applies innerHTML on every render of a new object.
 import { FC, useEffect, useMemo, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
@@ -33,7 +34,7 @@ const readable = (html: string): { html: string; dir: 'rtl' | 'ltr' } => {
   const root = doc.body.firstElementChild;
   if (!root) return { html, dir: 'ltr' };
   const dir = dirOf(root.textContent || '');
-  root.querySelectorAll('p, li, h3, h4, table').forEach((el) => {
+  root.querySelectorAll('p, ul, ol, h3, h4').forEach((el) => {
     const text = (el.textContent || '').trim();
     if (dirOf(text) !== dir && text.split(/\s+/).length >= OWN_DIRECTION_WORDS) el.setAttribute('dir', dirOf(text));
   });
