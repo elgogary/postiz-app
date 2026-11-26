@@ -1074,3 +1074,42 @@ model BrandSettings {
   @@index([orgId])
 }
 // <<< SANAD-BRANDS
+
+// >>> SANAD-BRANDS: one row per planned or reviewed post of a brand. postId is the Postiz root post id (the group
+// changes on every editor save, the root id does not). review: NONE | IN_REVIEW | SENT_BACK | APPROVED.
+model PostBrief {
+  id            String    @id @default(uuid())
+  orgId         String
+  customerId    String
+  postId        String?   @unique
+  planRef       String?
+  plannedAt     DateTime
+  format        String    @default("Text")
+  goal          String    @default("")
+  pillars       String[]
+  title         String    @default("")
+  sub           String    @default("")
+  caption       String    @default("")
+  slidesLabel   String    @default("")
+  slides        Json      @default("[]")
+  visual        String    @default("")
+  imagePrompt   String    @default("")
+  why           String    @default("")
+  verify        String    @default("")
+  firstDraft    Boolean   @default(false)
+  review        String    @default("NONE")
+  sentById      String?
+  sentAt        DateTime?
+  ownCheckedBy  String?
+  listCheckedBy String?
+  decidedById   String?
+  decidedAt     DateTime?
+  slideComments Json      @default("{}")
+  ideaId        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([customerId, planRef])
+  @@index([orgId, customerId])
+}
+// <<< SANAD-BRANDS
