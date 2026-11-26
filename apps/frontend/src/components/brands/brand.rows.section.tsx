@@ -21,7 +21,7 @@ export const cellView = (t: Tr, c: ColumnSpec, v: string) => {
   return <span className="whitespace-pre-line">{v}</span>;
 };
 
-const inputCls = 'w-full min-w-[120px] min-h-[36px] p-[8px] bg-input border border-fifth rounded-[6px] text-[13px]';
+const inputCls = 'w-full min-w-[120px] min-h-[36px] max-[480px]:min-h-[44px] p-[8px] bg-input border border-fifth rounded-[6px] text-[13px]';
 
 export const BrandRowsSection: FC<{
   sectionKey: RowSectionKey; label: string; data?: SectionData; canEdit: boolean; onSave: (rows: string[][]) => Promise<void>;
@@ -74,7 +74,7 @@ export const BrandRowsSection: FC<{
           {rows.length > 0 && !draft && <div className="text-[12px] text-customColor18">{rows.length} {t('rows', 'rows')}{data?.updatedBy ? ` · ${data.updatedBy}` : ''}</div>}
         </div>
         {canEdit && !draft && (
-          <button className="ms-auto text-[13px] px-[16px] h-[36px] rounded-[8px] hover:bg-newColColor" onClick={start}>{t('edit', 'Edit')}</button>
+          <button className="ms-auto text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] hover:bg-newColColor" onClick={start}>{t('edit', 'Edit')}</button>
         )}
       </div>
       {data?.note && !draft && <p className="text-[13px] text-customColor18" dir={dirOf(data.note)}>{data.note}</p>}
@@ -88,7 +88,7 @@ export const BrandRowsSection: FC<{
                   <tr key={i}>
                     {cols.map((c, j) => <td key={c.label} className="p-[4px] align-top">{input(c, r[j] || '', i, j)}</td>)}
                     <td className="p-[4px] align-middle">
-                      <button aria-label={`${t('delete_row', 'Delete row')} ${i + 1}`} className="w-[36px] h-[36px] rounded-[6px] hover:bg-newColColor" onClick={() => setDraft((d) => d!.filter((_, k) => k !== i))}>✕</button>
+                      <button aria-label={`${t('delete_row', 'Delete row')} ${i + 1}`} className="w-[36px] max-[480px]:w-[44px] h-[36px] max-[480px]:h-[44px] rounded-[6px] hover:bg-newColColor" onClick={() => setDraft((d) => d!.filter((_, k) => k !== i))}>✕</button>
                     </td>
                   </tr>
                 ))}
@@ -96,9 +96,9 @@ export const BrandRowsSection: FC<{
             </table>
           </div>
           <div className="flex gap-[8px]">
-            <button className="text-[13px] px-[16px] h-[36px] rounded-[8px] border border-fifth" onClick={() => setDraft((d) => [...d!, cols.map(() => '')])}>+ {t('add_row', 'Add row')}</button>
-            <button className="ms-auto text-[13px] px-[16px] h-[36px] rounded-[8px]" onClick={cancel}>{t('cancel', 'Cancel')}</button>
-            <button disabled={busy} className="text-[13px] px-[16px] h-[36px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={save}>{t('save', 'Save')}</button>
+            <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] border border-fifth" onClick={() => setDraft((d) => [...d!, cols.map(() => '')])}>+ {t('add_row', 'Add row')}</button>
+            <button className="ms-auto text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px]" onClick={cancel}>{t('cancel', 'Cancel')}</button>
+            <button disabled={busy} className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={save}>{t('save', 'Save')}</button>
           </div>
         </>
       ) : rows.length ? (

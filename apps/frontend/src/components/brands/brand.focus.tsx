@@ -4,7 +4,7 @@
 import { FC, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { BrandRowsSection } from './brand.rows.section';
-import type { SectionData } from './brands.api';
+import { dirOf, type SectionData } from './brands.api';
 
 const short = (iso: string) => (!iso ? '' : new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
 
@@ -19,7 +19,7 @@ export const BrandFocus: FC<{ data?: SectionData; canEdit: boolean; onSave: (row
     <article className="bg-sixth border border-fifth rounded-[12px] p-[24px] flex flex-col gap-[16px]">
       <div className="flex items-start gap-[16px]">
         <h3 className="text-[16px] font-[600]">{t('focus', 'Focus')}</h3>
-        {canEdit && <button className="ms-auto text-[13px] px-[16px] h-[36px] rounded-[8px] hover:bg-newColColor" onClick={() => setEditing(true)}>{t('edit', 'Edit')}</button>}
+        {canEdit && <button className="ms-auto text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] hover:bg-newColColor" onClick={() => setEditing(true)}>{t('edit', 'Edit')}</button>}
       </div>
       {rows.length ? (
         <div className="grid gap-[16px] [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
@@ -29,8 +29,8 @@ export const BrandFocus: FC<{ data?: SectionData; canEdit: boolean; onSave: (row
                 <span className="px-[8px] rounded-[6px] bg-newColColor">{t('week', 'Week')} {i + 1}</span>
                 <span className="text-customColor18">{[short(start), short(end)].filter(Boolean).join(` ${t('to', 'to')} `)}</span>
               </div>
-              <h4 className="text-[14px] font-[600]" dir="auto">{theme}</h4>
-              <p className="text-[13px] text-customColor18 leading-[1.6]" dir="auto">{desc}</p>
+              <h4 className="text-[14px] font-[600]" dir={dirOf(theme)}>{theme}</h4>
+              <p className="text-[13px] text-customColor18 leading-[1.6]" dir={dirOf(desc)}>{desc}</p>
             </div>
           ))}
         </div>

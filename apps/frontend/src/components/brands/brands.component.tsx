@@ -63,7 +63,7 @@ export const Brands: FC = () => {
     return (
       <div className="p-[24px] flex items-center gap-[16px] text-[14px] text-customColor18">
         {t('brands_load_failed', 'Could not load brands.')}
-        <button className="text-[13px] font-[600] px-[16px] h-[36px] rounded-[8px] border border-fifth" onClick={load}>{t('try_again', 'Try again')}</button>
+        <button className="text-[13px] font-[600] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] border border-fifth" onClick={load}>{t('try_again', 'Try again')}</button>
       </div>
     );
   }
@@ -118,11 +118,11 @@ export const Brands: FC = () => {
             </div>
             {isAdmin && (
               <div className="ms-auto flex gap-[8px]">
-                <button className="text-[13px] font-[600] px-[16px] h-[36px] rounded-[8px] border border-fifth" onClick={() => modals.openModal({
+                <button className="text-[13px] font-[600] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] border border-fifth" onClick={() => modals.openModal({
                   title: t('import_plan', 'Import plan'), closeOnClickOutside: true, closeOnEscape: true,
                   children: (close: () => void) => <BrandImportModal brandId={current} close={close} onDone={load} />,
                 })}>{t('import_plan', 'Import plan')}</button>
-                <button className="text-[13px] font-[600] px-[16px] h-[36px] rounded-[8px] border border-fifth" onClick={() => modals.openModal({
+                <button className="text-[13px] font-[600] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] border border-fifth" onClick={() => modals.openModal({
                   title: `${t('access_and_approval', 'Access and approval')} · ${brand.name}`, closeOnClickOutside: true, closeOnEscape: true,
                   children: (close: () => void) => <BrandAccessModal brandId={current} close={close} onSaved={load} />,
                 })}>{t('access', 'Access')}</button>
@@ -133,7 +133,7 @@ export const Brands: FC = () => {
         <div role="tablist" className="flex gap-[16px] border-b border-fifth overflow-x-auto">
           {TABS.map(([k, l]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => go({ tab: k })}
-              className={`shrink-0 whitespace-nowrap py-[8px] text-[14px] border-b-2 ${tab === k ? 'border-[#612BD3] text-[#612BD3] font-[600]' : 'border-transparent'}`}>
+              className={`shrink-0 whitespace-nowrap py-[8px] text-[14px] border-b-2 max-[480px]:min-h-[44px] max-[480px]:min-w-[44px] ${tab === k ? 'border-[#612BD3] text-[#612BD3] font-[600]' : 'border-transparent'}`}>
               {t(k, l)}
             </button>
           ))}

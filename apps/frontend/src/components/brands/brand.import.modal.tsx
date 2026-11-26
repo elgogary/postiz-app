@@ -38,7 +38,7 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
   };
 
   return (
-    <div className="flex flex-col gap-[16px] min-w-[480px]">
+    <div className="flex flex-col gap-[16px] min-w-[min(480px,calc(100vw_-_64px))]">
       <label className="flex flex-col gap-[8px] text-[13px] font-[600]">
         {t('plan_file', 'Plan file (HTML)')}
         <input type="file" accept=".html,text/html" onChange={(e) => pick(e.target.files?.[0])} className="text-[13px] font-[400]" />
@@ -52,8 +52,8 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
         </div>
       )}
       <div className="flex justify-end gap-[8px]">
-        <button className="text-[13px] px-[16px] h-[36px] rounded-[8px]" onClick={close}>{t('cancel', 'Cancel')}</button>
-        <button disabled={!summary || busy} className="text-[13px] px-[16px] h-[36px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={run}>{t('import', 'Import')}</button>
+        <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px]" onClick={close}>{t('cancel', 'Cancel')}</button>
+        <button disabled={!summary || busy} className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={run}>{t('import', 'Import')}</button>
       </div>
     </div>
   );

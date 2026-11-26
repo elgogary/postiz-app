@@ -53,7 +53,7 @@ export const BrandTextSection: FC<{
           )}
         </div>
         {canEdit && !editing && (
-          <button className="ms-auto text-[13px] px-[16px] h-[36px] rounded-[8px] hover:bg-newColColor" onClick={() => setEditing(true)}>
+          <button className="ms-auto text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] hover:bg-newColColor" onClick={() => setEditing(true)}>
             {t('edit', 'Edit')}
           </button>
         )}
@@ -64,8 +64,8 @@ export const BrandTextSection: FC<{
             <EditorContent editor={editor} />
           </div>
           <div className="flex justify-end gap-[8px]">
-            <button className="text-[13px] px-[16px] h-[36px] rounded-[8px]" onClick={() => setEditing(false)}>{t('cancel', 'Cancel')}</button>
-            <button disabled={busy} className="text-[13px] px-[16px] h-[36px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={save}>
+            <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px]" onClick={() => setEditing(false)}>{t('cancel', 'Cancel')}</button>
+            <button disabled={busy} className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={save}>
               {t('save', 'Save')}
             </button>
           </div>

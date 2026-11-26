@@ -28,13 +28,13 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
   };
 
   return (
-    <div className="flex flex-col gap-[16px] min-w-[480px]">
+    <div className="flex flex-col gap-[16px] min-w-[min(480px,calc(100vw_-_64px))]">
       <label className="flex items-center gap-[16px] py-[8px] border-b border-fifth">
         <span className="flex flex-col">
           <span className="text-[14px] font-[600]">{t('posts_need_approval', 'Posts need approval')}</span>
           <span className="text-[12px] text-customColor18">{t('approval_help', 'When on, a post is scheduled only after an approver approves it.')}</span>
         </span>
-        <input type="checkbox" role="switch" className="ms-auto w-[44px] h-[24px] accent-[#612BD3]" checked={approval} onChange={(e) => setApproval(e.target.checked)} />
+        <input type="checkbox" role="switch" className="ms-auto w-[44px] h-[24px] max-[480px]:h-[44px] accent-[#612BD3]" checked={approval} onChange={(e) => setApproval(e.target.checked)} />
       </label>
       {people.map((p) => (
         <div key={p.userId} className="flex items-center gap-[16px] py-[8px] border-b border-fifth">
@@ -50,7 +50,7 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
                 const on = (changed[p.userId] || p.access) === r;
                 return (
                   <button key={r} aria-pressed={on} onClick={() => setChanged((c) => ({ ...c, [p.userId]: r }))}
-                    className={`px-[16px] h-[36px] text-[13px] ${on ? 'bg-[#612BD3] text-white font-[600]' : ''}`}>
+                    className={`px-[16px] h-[36px] max-[480px]:h-[44px] text-[13px] ${on ? 'bg-[#612BD3] text-white font-[600]' : ''}`}>
                     {r === 'VIEW' ? t('view', 'View') : r === 'CREATE' ? t('create', 'Create') : t('approve', 'Approve')}
                   </button>
                 );
@@ -60,8 +60,8 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
         </div>
       ))}
       <div className="flex justify-end gap-[8px]">
-        <button className="text-[13px] px-[16px] h-[36px] rounded-[8px]" onClick={close}>{t('cancel', 'Cancel')}</button>
-        <button className="text-[13px] px-[16px] h-[36px] rounded-[8px] bg-[#612BD3] text-white" onClick={save}>{t('save', 'Save')}</button>
+        <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px]" onClick={close}>{t('cancel', 'Cancel')}</button>
+        <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] bg-[#612BD3] text-white" onClick={save}>{t('save', 'Save')}</button>
       </div>
     </div>
   );
