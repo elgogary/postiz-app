@@ -116,7 +116,7 @@ export const BrandPostCard: FC<{
       <div className="text-[12px] text-customColor18">{who}</div>
       {c.state === 'changes' && c.lastNote && (
         <div className="text-[13px] border border-fifth rounded-[8px] p-[8px]">
-          <span className="font-[600]">{c.lastNote.by}</span>{c.lastNote.slide ? ` · ${t('slide', 'Slide')} ${c.lastNote.slide}` : ''}
+          <span className="font-[600]">{c.lastNote.by}</span>{c.lastNote.slide ? ` · ${t('slide_n', 'Slide {n}').replace('{n}', String(c.lastNote.slide))}` : ''}
           <div dir={dirOf(c.lastNote.text)}>{c.lastNote.text}</div>
         </div>
       )}

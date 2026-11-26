@@ -13,7 +13,7 @@ export const CommentList: FC<{ items: PostComment[] }> = ({ items }) => {
         <li key={c.id} className="text-[13px]">
           <span className="font-[600]">{c.by}</span>
           <span className="text-customColor18"> · {new Date(c.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-          {c.slide ? <span className="ms-[8px] text-[12px] px-[6px] rounded-[6px] border border-fifth">{t('slide', 'Slide')} {c.slide}</span> : null}
+          {c.slide ? <span className="ms-[8px] text-[12px] px-[6px] rounded-[6px] border border-fifth">{t('slide_n', 'Slide {n}').replace('{n}', String(c.slide))}</span> : null}
           <div dir={dirOf(c.text)}>{c.text}</div>
         </li>
       ))}
