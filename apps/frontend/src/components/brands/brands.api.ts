@@ -14,11 +14,13 @@ export interface AccessPerson { userId: string; name: string; orgRole: string; a
 // Arabic letters: base, supplement, extended-A, presentation forms A and B.
 export const AR = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 const AR_ALL = new RegExp(AR.source, 'g');
-// One rule for every text: right to left when it has at least as many Arabic letters as Latin letters (so an English
-// line with one Arabic name stays left to right); empty or letterless text is left to right.
+// One rule for every text: right to left when at least a fifth of its letters are Arabic. Arabic sentences here
+// carry many English terms (measured down to 25% Arabic letters), while an English line naming one Arabic person
+// sits near 5%; empty or letterless text is left to right.
 export const dirOf = (v: string) => {
   const ar = (v.match(AR_ALL) || []).length;
-  return ar > 0 && ar >= (v.match(/[A-Za-z]/g) || []).length ? 'rtl' : 'ltr';
+  const all = ar + (v.match(/[A-Za-z]/g) || []).length;
+  return ar > 0 && ar * 5 >= all ? 'rtl' : 'ltr';
 };
 
 // A failed call carries the server's message when there is one, else only the status, so the toast can translate the fallback.
