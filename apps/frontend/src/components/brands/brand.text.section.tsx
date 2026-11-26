@@ -1,7 +1,9 @@
 'use client';
-// >>> SANAD-BRANDS: one brand-book text section. Read view sets each block's direction from its own text, so Arabic
-// lines read right to left even when they start with an English term. The directions are written into the HTML
-// string (memoized): React 19 re-applies innerHTML on every render of a new object, which wiped DOM-set attributes.
+// >>> SANAD-BRANDS: one brand-book text section. The read view takes ONE direction from the whole section's text, so
+// every line of an Arabic section starts on the right, its English headings too (per-block directions made short
+// English lines jump to the left edge). A block keeps its own direction only when it is a full paragraph (12+ words)
+// in the other language. Hashtags and @mentions are left-to-right islands, and "Name #HEX" lines become colour chips.
+// All of it is written into the HTML string (memoized): React 19 re-applies innerHTML on every render of a new object.
 import { FC, useEffect, useMemo, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -12,12 +14,55 @@ import { dirOf, errorText, SectionData } from './brands.api';
 // Only what the backend keeps (cleanHtml in brand.rules.ts): h3/h4, lists, bold, italic, underline, links, line breaks.
 const EDITOR_OPTIONS = { heading: { levels: [3, 4] as [3, 4] }, blockquote: false, code: false, codeBlock: false, strike: false, horizontalRule: false } as const;
 
-const withDirections = (html: string) => {
-  if (typeof window === 'undefined' || !html) return html;
-  const root = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').body.firstElementChild;
-  if (!root) return html;
-  root.querySelectorAll('p, li, ul, ol, h3, h4, table').forEach((el) => el.setAttribute('dir', dirOf(el.textContent || '')));
-  return root.innerHTML;
+const OWN_DIRECTION_WORDS = 12;
+const SWATCH = /^\s*([A-Za-z][A-Za-z ]{0,20}?)\s*(#[0-9A-Fa-f]{6})\s*$/;
+const TAG = /([#@][A-Za-z0-9_]+)/;
+// a 600px column (about 75 characters of 15px Arabic), headings with room above, chips for colours
+const READ_VIEW = 'max-w-[600px] me-auto text-[15px] leading-[1.8] [&_ul]:ps-[24px] [&_ul]:list-disc [&_ol]:ps-[24px] [&_ol]:list-decimal '
+  + '[&_li+li]:mt-[4px] [&_strong]:font-[600] [&_p+p]:mt-[8px] [&_:is(h3,h4)]:text-[15px] [&_:is(h3,h4)]:font-[600] '
+  + '[&_:is(h3,h4)]:mt-[24px] [&_:is(h3,h4)]:mb-[8px] [&>:first-child]:mt-0 [&_.swatches]:flex [&_.swatches]:flex-wrap '
+  + '[&_.swatches]:gap-[8px] [&_.swatches]:my-[8px] [&_.swatch]:inline-flex [&_.swatch]:items-center [&_.swatch]:gap-[8px] '
+  + '[&_.swatch]:py-[4px] [&_.swatch]:ps-[6px] [&_.swatch]:pe-[10px] [&_.swatch]:border [&_.swatch]:border-fifth '
+  + '[&_.swatch]:rounded-[6px] [&_.swatch]:bg-input [&_.swatch]:text-[13px] [&_.swatch]:[direction:ltr] '
+  + '[&_.swatch_i]:w-[16px] [&_.swatch_i]:h-[16px] [&_.swatch_i]:rounded-[4px] [&_.swatch_i]:border [&_.swatch_i]:border-fifth '
+  + '[&_.swatch_code]:text-[12px] [&_.swatch_code]:text-customColor18';
+
+const readable = (html: string): { html: string; dir: 'rtl' | 'ltr' } => {
+  if (typeof window === 'undefined' || !html) return { html, dir: 'ltr' };
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  const root = doc.body.firstElementChild;
+  if (!root) return { html, dir: 'ltr' };
+  const dir = dirOf(root.textContent || '');
+  root.querySelectorAll('p, li, h3, h4, table').forEach((el) => {
+    const text = (el.textContent || '').trim();
+    if (dirOf(text) !== dir && text.split(/\s+/).length >= OWN_DIRECTION_WORDS) el.setAttribute('dir', dirOf(text));
+  });
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const tagged: Text[] = [];
+  while (walker.nextNode()) if (TAG.test(walker.currentNode.nodeValue || '')) tagged.push(walker.currentNode as Text);
+  tagged.forEach((node) => node.replaceWith(...(node.nodeValue || '').split(TAG).map((part, i) => {
+    if (i % 2 === 0) return doc.createTextNode(part);
+    const island = doc.createElement('bdi');
+    island.setAttribute('dir', 'ltr');
+    island.textContent = part;
+    return island;
+  })));
+  let row: Element | null = null;
+  [...root.children].forEach((el) => {
+    const m = el.tagName === 'P' ? SWATCH.exec(el.textContent || '') : null;
+    if (!m) { row = null; return; }
+    if (!row) { row = doc.createElement('div'); row.className = 'swatches'; el.before(row); }
+    const chip = doc.createElement('span');
+    chip.className = 'swatch';
+    const colour = doc.createElement('i');
+    colour.setAttribute('style', `background:${m[2]}`);
+    const code = doc.createElement('code');
+    code.textContent = m[2].toUpperCase();
+    chip.append(colour, `${m[1]} `, code);
+    row.append(chip);
+    el.remove();
+  });
+  return { html: root.innerHTML, dir };
 };
 
 export const BrandTextSection: FC<{
@@ -28,7 +73,8 @@ export const BrandTextSection: FC<{
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const editor = useEditor({ extensions: [StarterKit.configure(EDITOR_OPTIONS)], content: data?.content || '', immediatelyRender: false });
-  const inner = useMemo(() => ({ __html: withDirections(data?.content || '') }), [data?.content]);
+  const read = useMemo(() => readable(data?.content || ''), [data?.content]);
+  const inner = useMemo(() => ({ __html: read.html }), [read]);
 
   useEffect(() => { if (editing) editor?.commands.setContent(data?.content || ''); }, [editing]);
 
@@ -74,8 +120,7 @@ export const BrandTextSection: FC<{
           </div>
         </>
       ) : data?.content ? (
-        <div className="text-[14px] leading-[1.75] [&_ul]:ps-[24px] [&_ul]:list-disc [&_ol]:ps-[24px] [&_ol]:list-decimal [&_strong]:font-[600] [&_p+p]:mt-[8px]"
-          dangerouslySetInnerHTML={inner} />
+        <div dir={read.dir} data-voice-body className={READ_VIEW} dangerouslySetInnerHTML={inner} />
       ) : (
         <p className="text-[14px] text-customColor18">{t('not_written_yet', 'Not written yet.')}</p>
       )}
