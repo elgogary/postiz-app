@@ -65,23 +65,25 @@ export class BrandsService {
     await this.mustCustomer(orgId, customerId);
     const roleOf = await this.roles(orgId, userId, orgRole);
     if (!canEdit(roleOf(customerId))) throw new ForbiddenException('You can view this brand but not change it');
+    let values: { content?: string; rows?: string[][]; note?: string | null };
     try {
       if (isTextSection(key)) {
         if (dto.content === undefined || dto.content === null) throw new BadRequestException('Text is missing');
-        return await this._repo.saveSection(orgId, customerId, key, userId, { content: cleanHtml(dto.content) });
-      }
-      if (isRowSection(key)) {
+        values = { content: cleanHtml(dto.content) };
+      } else if (isRowSection(key)) {
         if (!dto.rows) throw new BadRequestException('Rows are missing');
-        return await this._repo.saveSection(orgId, customerId, key, userId, {
+        values = {
           rows: validateRows(key, dto.rows),
-          ...(dto.note !== undefined ? { note: dto.note.trim() || null } : {}),
-        });
+          ...(typeof dto.note === 'string' ? { note: dto.note.trim() || null } : {}),
+        };
+      } else {
+        throw new BadRequestException(`Unknown section ${key}`);
       }
     } catch (e) {
       if (e instanceof BadRequestException) throw e;
       throw new BadRequestException((e as Error).message);
     }
-    throw new BadRequestException(`Unknown section ${key}`);
+    return this._repo.saveSection(orgId, customerId, key, userId, values);
   }
 
   async getAccess(orgId: string, orgRole: OrgRole, customerId: string) {
