@@ -30,6 +30,7 @@ test('mini plan: sections, typed rows, notes and posts', () => {
   assert.match(plan.sections.summary, /<strong>message<\/strong>/);
   assert.doesNotMatch(plan.sections.summary, /POSITIONING/);
   assert.match(plan.sections.voice, /Own words/);
+  assert.match(plan.sections.mix, /Mix/);
   assert.deepEqual(plan.rows.focus[1].slice(0, 2), ['2026-11-29', '2026-12-05']);
   assert.deepEqual(plan.rows.bench[0].slice(0, 4), ['Sara\nCEO, Acme', '', '2500', '']);
   assert.deepEqual(plan.rows.kpi, [['Followers', 'growth', '10%']]);

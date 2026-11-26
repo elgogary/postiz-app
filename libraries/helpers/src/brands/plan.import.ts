@@ -3,6 +3,7 @@
 // A section with nothing parsed is skipped, so an import never writes an empty list over existing content. Any error from cleanHtml/validateRows propagates.
 import { cleanHtml, validateRows } from './brand.rules';
 import type { ParsedPlan } from './plan.parser';
+import { briefsFromPlan, BriefWrite } from './post.rules';
 
 export interface SectionWrite {
   key: string;
@@ -11,8 +12,9 @@ export interface SectionWrite {
   note?: string | null;
 }
 
-export function prepareImport(plan: ParsedPlan): {
+export function prepareImport(plan: ParsedPlan, tzOffset = 0): {
   writes: SectionWrite[];
+  briefs: BriefWrite[];
   summary: { sections: string[]; rows: Record<string, number>; posts: number };
 } {
   const writes: SectionWrite[] = [];
@@ -23,12 +25,14 @@ export function prepareImport(plan: ParsedPlan): {
     const clean = validateRows(key, rows);
     if (clean.length) writes.push({ key, rows: clean, note: plan.notes[key] || null });
   }
+  const briefs = briefsFromPlan(plan.posts, plan.goals, tzOffset);
   return {
     writes,
+    briefs,
     summary: {
       sections: writes.filter((w) => w.content !== undefined).map((w) => w.key),
       rows: Object.fromEntries(writes.filter((w) => w.rows !== undefined).map((w) => [w.key, w.rows!.length])),
-      posts: plan.posts.length,
+      posts: briefs.length,
     },
   };
 }

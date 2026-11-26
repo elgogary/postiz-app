@@ -4,14 +4,15 @@ import { prepareImport } from './plan.import';
 import type { ParsedPlan } from './plan.parser';
 
 const plan = (): ParsedPlan => ({
-  sections: { summary: '<p>Hello</p>', voice: '<p>Warm</p>', routine: '', profile: '<p>Bio</p>' },
+  sections: { summary: '<p>Hello</p>', voice: '<p>Warm</p>', routine: '', profile: '<p>Bio</p>', mix: '' },
   rows: {
     pillars: [['Pillar A'], ['  '], ['Pillar B']],
     bench: [], kpi: [['Reach', 'Views', '1000']], review: [], history: [],
     focus: [['2026-01-01', '2026-01-07', 'Launch', 'Intro week']],
   },
   notes: { kpi: 'Monthly' },
-  posts: [{} as any, {} as any, {} as any],
+  posts: [1, 2, 3].map((n) => ({ n, date: `2026-12-0${n}`, week: 1, fmt: 'Text', goal: '', pillar: '', pillars: [], title: 'T', sub: '',
+    sl: '', slides: [], cap: '', cta: '', vis: '', prompt: '', verify: '' }) as any),
   goals: {},
 });
 
@@ -57,4 +58,20 @@ test('script tags are cleaned out of text sections', () => {
   p.sections.summary = '<p>Hi</p><script>alert(1)</script>';
   const w = prepareImport(p).writes.find((x) => x.key === 'summary')!;
   assert.ok(!/<script/i.test(w.content!));
+});
+
+test('plan posts become briefs at 09:30 local, numbered from the first date', () => {
+  const plan = {
+    sections: { summary: '', voice: '', routine: '', profile: '', mix: '' },
+    rows: { pillars: [], bench: [], kpi: [], review: [], history: [], focus: [] },
+    notes: {}, goals: { aw: 'Awareness' },
+    posts: [{ n: 3, date: '2026-12-01', week: 1, fmt: 'Video', goal: 'aw', pillar: 'Ops', pillars: ['Ops'], title: 'T', sub: '',
+      sl: '', slides: [], cap: 'c', cta: '', vis: '', prompt: '', verify: '' }],
+  };
+  const out = prepareImport(plan as never, -120);
+  assert.equal(out.briefs.length, 1);
+  assert.equal(out.briefs[0].planRef, '2026-12-01#3');
+  assert.equal(out.briefs[0].plannedAt, '2026-12-01T07:30:00.000Z');
+  assert.equal(out.briefs[0].format, 'Video');
+  assert.equal(out.summary.posts, 1);
 });

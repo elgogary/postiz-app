@@ -11,7 +11,7 @@ export interface ColumnSpec {
   empty?: string;
 }
 
-export const TEXT_SECTIONS = ['summary', 'voice', 'routine', 'profile'] as const;
+export const TEXT_SECTIONS = ['summary', 'voice', 'routine', 'profile', 'mix'] as const;
 export type TextSectionKey = (typeof TEXT_SECTIONS)[number];
 
 const text = (label: string): ColumnSpec => ({ label, type: 'text' });

@@ -39,7 +39,8 @@ function fakeRepo(opts: { access?: { customerId: string; role: string }[]; secti
   };
   return repo;
 }
-const serviceWith = (repo: ReturnType<typeof fakeRepo>) => new BrandsService(repo as any);
+const fakePosts = { briefs: async () => [], posts: async () => [], briefUpsert: () => ({}), waiting: async () => [] } as never;
+const serviceWith = (repo: ReturnType<typeof fakeRepo>) => new BrandsService(repo as any, fakePosts);
 
 const PLAN = '<script>const GOALS={};const WEEKS=[{n:1,range:"1 – 7 نوفمبر",title:"Week",desc:"d"}];'
   + 'const P=[{n:1,date:"2026-11-02",pillar:"Alpha"}];</script>';
@@ -75,6 +76,7 @@ test('a dry-run import writes nothing and lists the sections it would replace', 
   const res = await serviceWith(repo).importPlan(ORG, 'u1', 'ADMIN', BRAND, { html: PLAN, dryRun: true }) as any;
   assert.equal(res.dryRun, true);
   assert.deepEqual(res.replaces, ['pillars']);
+  assert.equal(res.matched, 0);
   assert.deepEqual(Object.keys(res.rows), ['pillars', 'focus']);
   assert.equal(repo.calls.saveSections.length, 0);
   const real = await serviceWith(repo).importPlan(ORG, 'u1', 'ADMIN', BRAND, { html: PLAN, dryRun: false }) as any;

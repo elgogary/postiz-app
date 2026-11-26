@@ -1,5 +1,5 @@
 // >>> SANAD-BRANDS
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class SaveSectionDto {
   @IsOptional() @IsString() @MaxLength(100000) content?: string;
@@ -19,5 +19,6 @@ export class SetSettingsDto {
 export class ImportPlanDto {
   @IsString() @MaxLength(2000000) html: string;
   @IsBoolean() dryRun: boolean;
+  @IsOptional() @IsInt() @Min(-840) @Max(840) tzOffset?: number;
 }
 // <<< SANAD-BRANDS

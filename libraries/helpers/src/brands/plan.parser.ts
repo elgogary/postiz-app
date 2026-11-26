@@ -5,7 +5,7 @@ export interface PlanPost {
   title: string; sub: string; sl: string; slides: string[]; cap: string; cta: string; vis: string; prompt: string; verify: string;
 }
 export interface ParsedPlan {
-  sections: Record<'summary' | 'voice' | 'routine' | 'profile', string>;
+  sections: Record<'summary' | 'voice' | 'routine' | 'profile' | 'mix', string>;
   rows: Record<'pillars' | 'bench' | 'kpi' | 'review' | 'history' | 'focus', string[][]>;
   notes: Record<string, string>;
   posts: PlanPost[];
@@ -206,7 +206,7 @@ export function parsePlan(page: string): ParsedPlan {
   const [checks, rules] = review.includes('</ol>') ? [review.split('</ol>')[0], review.split('</ol>').slice(1).join('</ol>')] : [review, ''];
   const bench = tab('bench'), kpi = tab('kpi'), history = tab('history');
   return {
-    sections: { summary: tab('overview'), voice: tab('voice') + rules.trim(), routine: tab('routine'), profile: tab('profile') },
+    sections: { summary: tab('overview'), voice: tab('voice') + rules.trim(), routine: tab('routine'), profile: tab('profile'), mix: tab('mix') },
     rows: {
       pillars: [...new Set(raw.flatMap(postPillars))].map((p) => [p]),
       bench: tableRows(bench).map(benchRow),
