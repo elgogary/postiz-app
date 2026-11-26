@@ -18,15 +18,21 @@ const plan = (): ParsedPlan => ({
 test('writes one entry per non-empty text section and per row section; blank rows dropped', () => {
   const { writes, summary } = prepareImport(plan());
   assert.deepEqual(writes.filter((w) => w.content !== undefined).map((w) => w.key), ['summary', 'voice', 'profile']);
-  assert.equal(writes.filter((w) => w.rows !== undefined).length, 6);
+  assert.deepEqual(writes.filter((w) => w.rows !== undefined).map((w) => w.key), ['pillars', 'kpi', 'focus']);
   assert.deepEqual(writes.find((w) => w.key === 'pillars')!.rows, [['Pillar A'], ['Pillar B']]);
   assert.equal(writes.find((w) => w.key === 'kpi')!.note, 'Monthly');
   assert.equal(writes.find((w) => w.key === 'pillars')!.note, null);
   assert.equal(summary.rows.pillars, 2);
   assert.equal(summary.rows.kpi, 1);
-  assert.equal(summary.rows.bench, 0);
+  assert.equal('bench' in summary.rows, false);
   assert.equal(summary.posts, 3);
   assert.deepEqual(summary.sections, ['summary', 'voice', 'profile']);
+});
+
+test('a row section with no parsed rows is never written (it would erase what is there)', () => {
+  const { writes, summary } = prepareImport(plan());
+  for (const key of ['bench', 'review', 'history']) assert.equal(writes.some((w) => w.key === key), false);
+  assert.deepEqual(Object.keys(summary.rows), ['pillars', 'kpi', 'focus']);
 });
 
 test('an empty text section is not written', () => {

@@ -12,7 +12,6 @@ export interface ParsedPlan {
   goals: Record<string, string>;
 }
 
-const PILLARS = ['AI', 'Digital Transformation', 'Process Engineering'];
 const AR_MONTHS: Record<string, number> = { يناير: 1, فبراير: 2, مارس: 3, أبريل: 4, مايو: 5, يونيو: 6, يوليو: 7,
   أغسطس: 8, سبتمبر: 9, أكتوبر: 10, نوفمبر: 11, ديسمبر: 12 };
 const AGO_MONTHS: Record<string, number> = { يومين: 0, شهرين: 2, '3 شهور': 3, '4 شهور': 4 };
@@ -77,7 +76,8 @@ function readConst(script: string, name: string): unknown {
 
 function simplify(fragment: string): string {
   let f = fragment.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '');
-  f = f.replace(/<\/?(div|section|article|header|aside|span|a|blockquote|h1|h2)\b[^>]*>/gi, '\n');
+  f = f.replace(/<\/?(div|section|article|header|aside|blockquote|h1|h2)\b[^>]*>/gi, '\n');
+  f = f.replace(/<\/?(span|a)\b[^>]*>/gi, ' ');
   f = f.replace(/<(\w+)\b[^>]*?(\/?)>/g, (m, t: string, sl: string) => (KEEP.has(t.toLowerCase()) ? `<${t.toLowerCase()}${sl}>` : ''));
   f = f.replace(/<\/(\w+)>/g, (m, t: string) => (KEEP.has(t.toLowerCase()) ? `</${t.toLowerCase()}>` : ''));
   const out: string[] = [];
@@ -114,22 +114,66 @@ function sectionHtml(page: string, id: string, ids: string[]): string {
   return simplify(page.slice(after, end).split('>').slice(1).join('>'));
 }
 
-function weekDates(range: string, year = 2026): [string, string] {
-  const [a, b = ''] = range.split(/[–-]/).map((x) => x.trim());
+type Ym = [number, number];
+
+// One week range ("15 – 21 Nov", "28 Dec – 3 Jan") to two ISO dates. `year` is the year of the range's start; an end
+// month before the start month is the next year.
+function weekDates(range: string, year: number): [string, string] {
+  const [a, b = ''] = String(range).split(/[–-]/).map((x) => x.trim());
   const [endDay, endMonthName] = b.split(/\s+/);
   const startBits = a.split(/\s+/);
   const endMonth = AR_MONTHS[endMonthName], startMonth = startBits[1] ? AR_MONTHS[startBits[1]] : endMonth;
   if (!endMonth || !startMonth) throw new Error('Not plan data: a week range has a month that is not recognised');
   const pad = (n: number) => String(n).padStart(2, '0');
-  return [`${year}-${pad(startMonth)}-${pad(Number(startBits[0]))}`, `${year}-${pad(endMonth)}-${pad(Number(endDay))}`];
+  const endYear = endMonth < startMonth ? year + 1 : year;
+  return [`${year}-${pad(startMonth)}-${pad(Number(startBits[0]))}`, `${endYear}-${pad(endMonth)}-${pad(Number(endDay))}`];
 }
 
-function agoToMonth(when: string, start: [number, number] = [2026, 11]): string {
+// Weeks run in order from the plan's first month: the first week may start in the month before the first post, and the
+// year steps up each time a week starts in an earlier month than the one before.
+function allWeekDates(weeks: { range: string }[], ref: Ym): [string, string][] {
+  let year = ref[0];
+  let prev = 0;
+  return weeks.map((w, i) => {
+    const bits = String(w.range).split(/[–-]/);
+    const startMonth = AR_MONTHS[bits[0].trim().split(/\s+/)[1]] || AR_MONTHS[(bits[1] || '').trim().split(/\s+/)[1]] || 0;
+    if (i === 0 && startMonth > ref[1]) year -= 1;
+    else if (i > 0 && startMonth && startMonth < prev) year += 1;
+    if (startMonth) prev = startMonth;
+    const dates = weekDates(w.range, year);
+    if (Number(dates[1].slice(0, 4)) > year) { year += 1; prev = 0; }
+    return dates;
+  });
+}
+
+function agoToMonth(when: string, start: Ym): string {
   if (!(when in AGO_MONTHS)) return '';
   let [y, m] = start;
   m -= AGO_MONTHS[when];
   while (m < 1) { y -= 1; m += 12; }
   return `${y}-${String(m).padStart(2, '0')}`;
+}
+
+function checkedPosts(raw: unknown): Omit<PlanPost, 'pillars'>[] {
+  if (!Array.isArray(raw) || !raw.length) throw new Error('Not plan data: the plan has no posts');
+  raw.forEach((p, i) => {
+    for (const field of ['date', 'pillar']) {
+      if (!p || typeof p[field] !== 'string' || !p[field].trim()) throw new Error(`Not plan data: post ${i + 1} is missing ${field}`);
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date)) throw new Error(`Not plan data: post ${i + 1} has a date that is not YYYY-MM-DD`);
+  });
+  return raw as Omit<PlanPost, 'pillars'>[];
+}
+
+const pillarTokens = (pillar: string) => pillar.split('·').map((x) => x.trim()).filter(Boolean);
+
+// A short form the plan itself also writes in full ("DT" next to "Digital Transformation", "Process" next to
+// "Process Engineering") is read as that full name. Only the plan's own words are used, never a fixed list.
+function pillarNames(posts: { pillar: string }[]): (token: string) => string {
+  const all = [...new Set(posts.flatMap((p) => pillarTokens(p.pillar)))];
+  const initials = (x: string) => x.split(/\s+/).map((w) => w[0]).join('').toUpperCase();
+  return (token) => all.find((long) => long.length > token.length && (initials(long) === token.toUpperCase()
+    || long.toLowerCase().startsWith(`${token.toLowerCase()} `))) || token;
 }
 
 function benchRow(r: string[]): string[] {
@@ -145,7 +189,14 @@ export function parsePlan(page: string): ParsedPlan {
   const script = (/<script[^>]*>([\s\S]*?)<\/script>/.exec(page) || [])[1] || '';
   const goals = readConst(script, 'GOALS') as Record<string, string>;
   const weeks = readConst(script, 'WEEKS') as { n: number; range: string; title: string; desc: string }[];
-  const raw = readConst(script, 'P') as Omit<PlanPost, 'pillars'>[];
+  const raw = checkedPosts(readConst(script, 'P'));
+  if (!Array.isArray(weeks)) throw new Error('Not plan data: WEEKS is not a list');
+  weeks.forEach((w, i) => { if (!w || typeof w.range !== 'string') throw new Error(`Not plan data: week ${i + 1} is missing range`); });
+  const first = raw.map((p) => p.date).sort()[0];
+  const ref: Ym = [Number(first.slice(0, 4)), Number(first.slice(5, 7))];
+  const weekRanges = allWeekDates(weeks, ref);
+  const pillarName = pillarNames(raw);
+  const postPillars = (p: { pillar: string }) => [...new Set(pillarTokens(p.pillar).map(pillarName))];
   const ids = [...page.matchAll(/id="([a-z]+)"/g)].map((m) => m[1]);
   const tab = (id: string) => sectionHtml(page, id, ids);
   const review = tab('review');
@@ -154,16 +205,16 @@ export function parsePlan(page: string): ParsedPlan {
   return {
     sections: { summary: tab('overview'), voice: tab('voice') + rules.trim(), routine: tab('routine'), profile: tab('profile') },
     rows: {
-      pillars: PILLARS.map((p) => [p]),
+      pillars: [...new Set(raw.flatMap(postPillars))].map((p) => [p]),
       bench: tableRows(bench).map(benchRow),
       kpi: tableRows(kpi),
       review: [...checks.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => [cellText(m[1])]),
-      history: tableRows(history).map(([when, idea]) => [agoToMonth(when), when === 'منافسين' ? 'competitor' : 'ours', idea]),
-      focus: weeks.map((w) => [...weekDates(w.range), w.title, w.desc]),
+      history: tableRows(history).map(([when, idea]) => [agoToMonth(when, ref), when === 'منافسين' ? 'competitor' : 'ours', idea]),
+      focus: weeks.map((w, i) => [...weekRanges[i], w.title, w.desc]),
     },
     notes: { bench: firstNote(bench), kpi: firstNote(kpi),
       history: 'Months worked out from the plan\'s own "2 days / 2, 3, 4 months ago", counted back from the plan start.' },
-    posts: raw.map((p) => ({ ...p, pillars: p.pillar.includes('·') ? PILLARS : [p.pillar] })),
+    posts: raw.map((p) => ({ ...p, pillars: postPillars(p) })),
     goals,
   };
 }

@@ -1,5 +1,6 @@
 // >>> SANAD-BRANDS: builds the full list of section writes from a parsed plan. Pure: nothing is saved here, so the
-// dry run and the real run check exactly the same data. Any error from cleanHtml/validateRows propagates.
+// dry run and the real run check exactly the same data.
+// A section with nothing parsed is skipped, so an import never writes an empty list over existing content. Any error from cleanHtml/validateRows propagates.
 import { cleanHtml, validateRows } from './brand.rules';
 import type { ParsedPlan } from './plan.parser';
 
@@ -19,7 +20,8 @@ export function prepareImport(plan: ParsedPlan): {
     if (html.trim()) writes.push({ key, content: cleanHtml(html) });
   }
   for (const [key, rows] of Object.entries(plan.rows)) {
-    writes.push({ key, rows: validateRows(key, rows), note: plan.notes[key] || null });
+    const clean = validateRows(key, rows);
+    if (clean.length) writes.push({ key, rows: clean, note: plan.notes[key] || null });
   }
   return {
     writes,

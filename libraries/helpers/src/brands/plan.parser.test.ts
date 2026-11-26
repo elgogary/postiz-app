@@ -35,11 +35,11 @@ test('mini plan: sections, typed rows, notes and posts', () => {
   assert.deepEqual(plan.rows.kpi, [['Followers', 'growth', '10%']]);
   assert.deepEqual(plan.rows.review, [['Check stories']]);
   assert.deepEqual(plan.rows.history, [['2026-09', 'ours', 'old idea'], ['', 'competitor', 'their idea']]);
-  assert.deepEqual(plan.rows.pillars, [['AI'], ['Digital Transformation'], ['Process Engineering']]);
+  assert.deepEqual(plan.rows.pillars, [['AI'], ['DT'], ['Process']]);
   assert.equal(plan.notes.bench, 'Check the numbers.');
   assert.equal(plan.posts.length, 2);
   assert.equal(plan.posts[0].cap, 'line1\nline2');
-  assert.deepEqual(plan.posts[1].pillars, ['AI', 'Digital Transformation', 'Process Engineering']);
+  assert.deepEqual(plan.posts[1].pillars, ['AI', 'DT', 'Process']);
   assert.equal(plan.goals.ed, 'Education');
 });
 
@@ -53,6 +53,41 @@ test('a section ends before the next section tag, not inside it', () => {
 
 test('a script with code is refused, not run', () => {
   assert.throws(() => parsePlan('<script>const P=[(function(){return 1})()];const GOALS={};const WEEKS=[];</script>'), /plan data/);
+});
+
+test('inline a and span stay inside their paragraph; block tags still break lines', () => {
+  const inline = parsePlan(MINI.replace('<p>Core <strong>message</strong></p>', '<p>Hello <a href="#x">link</a> and <span>x</span> end</p>'));
+  assert.match(inline.sections.summary, /<p>Hello\s+link\s+and\s+x\s+end<\/p>/);
+  const block = parsePlan(MINI.replace('<p>Core <strong>message</strong></p>', '<div>One</div><div>Two</div>'));
+  assert.match(block.sections.summary, /<p>One<\/p>\n<p>Two<\/p>/);
+});
+
+const datedPlan = (weeks: string, firstDate: string) => MINI
+  .replace(/const WEEKS=\[.*\];/, `const WEEKS=${weeks};`).replace('date:"2026-11-15"', `date:"${firstDate}"`).replace('date:"2026-11-30"', `date:"${firstDate}"`);
+
+test('years and "ago" months come from the plan\'s earliest post, not a fixed month', () => {
+  const plan = parsePlan(datedPlan('[{n:1,range:"28 ديسمبر – 3 يناير",title:"A",desc:""},{n:2,range:"4 – 10 يناير",title:"B",desc:""}]', '2026-12-29'));
+  assert.deepEqual(plan.rows.focus.map((r) => r.slice(0, 2)), [['2026-12-28', '2027-01-03'], ['2027-01-04', '2027-01-10']]);
+  assert.equal(plan.rows.history[0][0], '2026-10');
+  const march = parsePlan(datedPlan('[{n:1,range:"2 – 8 مارس",title:"A",desc:""}]', '2027-03-02'));
+  assert.deepEqual(march.rows.focus[0].slice(0, 2), ['2027-03-02', '2027-03-08']);
+  assert.equal(march.rows.history[0][0], '2027-01');
+});
+
+test('pillars: the plan\'s own short forms fold into its full names; nothing else is invented', () => {
+  const page = (...pillars: string[]) => withScript(`const GOALS={};const WEEKS=[];const P=[${pillars.map((p) => `{n:1,date:"2026-11-15",pillar:"${p}"}`).join(',')}];`);
+  const plan = parsePlan(page('Cloud Native · CN · Cloud', 'Data Mesh', 'Cloud Native'));
+  assert.deepEqual(plan.rows.pillars, [['Cloud Native'], ['Data Mesh']]);
+  assert.deepEqual(plan.posts[0].pillars, ['Cloud Native']);
+  assert.deepEqual(parsePlan(page('AI')).rows.pillars, [['AI']]);
+});
+
+test('a malformed post gives a plain "Not plan data" error', () => {
+  const bad = (post: string) => withScript(`const GOALS={};const WEEKS=[];const P=[${post}];`);
+  assert.throws(() => parsePlan(bad('{n:1,date:"2026-11-15"}')), /Not plan data: post 1 is missing pillar/);
+  assert.throws(() => parsePlan(bad('{n:1,pillar:"AI"}')), /Not plan data: post 1 is missing date/);
+  assert.throws(() => parsePlan(bad('{n:1,pillar:"AI",date:"soon"}')), /Not plan data: post 1 has a date/);
+  assert.throws(() => parsePlan(bad('null')), /Not plan data: post 1/);
 });
 
 const REAL = process.env.PLAN_FIXTURE || '';
@@ -70,7 +105,7 @@ test('a real plan file from PLAN_FIXTURE (skipped when unset)', { skip: !REAL ||
 });
 
 const withScript = (script: string) => `<script>${script}</script>`;
-const planWithCap = (capLiteral: string) => withScript(`const GOALS={};const WEEKS=[];const P=[{n:1,pillar:"AI",cap:${capLiteral}}];`);
+const planWithCap = (capLiteral: string) => withScript(`const GOALS={};const WEEKS=[];const P=[{n:1,date:"2026-11-15",pillar:"AI",cap:${capLiteral}}];`);
 
 test('escaped quotes and hex escapes survive', () => {
   assert.equal(parsePlan(planWithCap('"say \\"hi\\""')).posts[0].cap, 'say "hi"');

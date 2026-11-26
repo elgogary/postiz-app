@@ -126,9 +126,12 @@ export class BrandsService {
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
-    if (dto.dryRun) return { dryRun: true, ...prepared.summary };
+    const held = new Set((await this._repo.sections(orgId, customerId))
+      .filter((s) => (s.content ?? '').trim() !== '' || (Array.isArray(s.rows) && s.rows.length > 0)).map((s) => s.key));
+    const summary = { ...prepared.summary, replaces: prepared.writes.map((w) => w.key).filter((k) => held.has(k)) };
+    if (dto.dryRun) return { dryRun: true, ...summary };
     await this._repo.saveSections(orgId, customerId, userId, prepared.writes);
-    return { dryRun: false, ...prepared.summary };
+    return { dryRun: false, ...summary };
   }
 }
 // <<< SANAD-BRANDS

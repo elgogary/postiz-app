@@ -68,7 +68,9 @@ export function validateRows(key: string, rows: unknown): string[][] {
   return rows
     .map((row, i) => {
       if (!Array.isArray(row) || row.length !== cols.length) throw new Error(`Row ${i + 1} must have ${cols.length} cells`);
-      return row.map((cell, j) => checkCell(cols[j], cell, i + 1));
+      const cells = row.map((cell, j) => checkCell(cols[j], cell, i + 1));
+      if (key === 'focus' && cells[0] && cells[1] && cells[1] < cells[0]) throw new Error(`Row ${i + 1}: the end date is before the start date`);
+      return cells;
     })
     .filter((r) => r.some((c) => c !== ''));
 }

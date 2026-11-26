@@ -59,6 +59,11 @@ test('a date cell must be a real calendar date', () => {
   assert.throws(() => validateRows('focus', [['2026-02-31', '2026-03-01', 't', 'd']]), /Start/);
 });
 
+test('a Focus week may not end before it starts', () => {
+  assert.throws(() => validateRows('focus', [['2026-11-10', '2026-11-01', 't', 'd']]), /Row 1: the end date is before the start date/);
+  assert.equal(validateRows('focus', [['2026-11-10', '2026-11-10', 't', 'd'], ['2026-11-11', '', 't', 'd']]).length, 2);
+});
+
 test('week of a date comes from the Focus rows', () => {
   const focus = [['2026-11-15', '2026-11-21', 'a', ''], ['2026-11-22', '2026-11-28', 'b', '']];
   assert.equal(weekOf(focus, '2026-11-15'), 1);
