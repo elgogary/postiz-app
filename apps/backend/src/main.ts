@@ -60,6 +60,10 @@ async function start() {
     json({ limit: '50mb' })(req, res, next);
   });
 
+  // >>> SANAD-BRANDS
+  app.use('/brands', json({ limit: '5mb' }));
+  // <<< SANAD-BRANDS
+
   app.use(cookieParser());
   app.use(compression());
   app.useGlobalFilters(new SubscriptionExceptionFilter());

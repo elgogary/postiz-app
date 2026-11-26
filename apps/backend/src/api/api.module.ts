@@ -33,6 +33,9 @@ import { WebhookController } from '@gitroom/backend/api/routes/webhooks.controll
 // >>> SANAD-ENGAGEMENT
 import { EngagementController } from '@gitroom/backend/api/routes/engagement.controller';
 // <<< SANAD-ENGAGEMENT
+// >>> SANAD-BRANDS
+import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
+// <<< SANAD-BRANDS
 import { SignatureController } from '@gitroom/backend/api/routes/signature.controller';
 import { AutopostController } from '@gitroom/backend/api/routes/autopost.controller';
 import { SetsController } from '@gitroom/backend/api/routes/sets.controller';
@@ -66,6 +69,9 @@ const authenticatedController = [
   // >>> SANAD-ENGAGEMENT
   EngagementController,
   // <<< SANAD-ENGAGEMENT
+  // >>> SANAD-BRANDS
+  BrandsController,
+  // <<< SANAD-BRANDS
   SignatureController,
   AutopostController,
   SetsController,
