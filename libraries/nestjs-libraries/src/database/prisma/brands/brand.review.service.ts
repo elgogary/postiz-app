@@ -172,7 +172,9 @@ export class BrandReviewService {
     this.mustFuture(dto.date);
     const brief = await this._repo.brief(orgId, customerId, briefId);
     if (!brief) throw new NotFoundException('Planned post not found');
-    if (brief.postId) throw new BadRequestException('This post has a draft: change the draft date');
+    if (brief.postId && await this._repo.post(orgId, ctx.channels.map((c) => c.id), brief.postId)) {
+      throw new BadRequestException('This post has a draft: change the draft date');
+    }
     await this._repo.updateBrief(brief.id, { plannedAt: new Date(dto.date) });
     return { ok: true };
   }
@@ -192,7 +194,9 @@ export class BrandReviewService {
       posts: [{ integration: { id: channel.id }, value: [{ content: toHtml(brief.caption || brief.title), image: [] }], group: randomUUID(), settings: {} }],
     } as never, orgId);
     const [made] = await this._posts.createPost(orgId, body, 'WEB');
-    await this._repo.updateBrief(brief.id, { postId: made.postId });
+    await this._repo.updateBrief(brief.id, {
+      postId: made.postId, review: 'NONE', sentById: null, sentAt: null, decidedById: null, decidedAt: null, ownCheckedBy: null, listCheckedBy: null,
+    });
     return { postId: made.postId as string };
   }
 
@@ -200,6 +204,7 @@ export class BrandReviewService {
     const { ctx, brief, card } = await this.target(orgId, userId, orgRole, customerId, postId);
     this.mustApprove(ctx.role);
     if (card.format !== 'Poll') throw new BadRequestException('Only a poll is marked published by hand');
+    if (card.state === 'published') throw new BadRequestException('This post is already published');
     if (card.state === 'scheduled') await this._posts.changePostStatus(orgId, postId, 'draft');
     await this._posts.changeState(postId, 'PUBLISHED');
     if (brief) await this._repo.updateBrief(brief.id, { review: 'APPROVED', decidedById: userId, decidedAt: new Date() });

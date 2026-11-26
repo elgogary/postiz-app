@@ -891,7 +891,7 @@ export class PostsService {
       await this._brandApproval.assertCanQueue(orgId, body.posts.flatMap((p) => [
         { integrationId: p.integration.id, postId: p.value?.[0]?.id || null },
         ...(p.value || []).slice(1).filter((v) => v.id).map((v) => ({ integrationId: p.integration.id, postId: v.id as string })),
-      ]));
+      ]), { allowPublished: body.type === 'update' });
     }
     // <<< SANAD-BRANDS
     const postList = [];
@@ -997,6 +997,12 @@ export class PostsService {
     action: 'schedule' | 'update' = 'schedule'
   ) {
     const getPostById = await this._postRepository.getPostById(id, orgId);
+    // >>> SANAD-BRANDS
+    // Dragging a failed or published post schedule it as a new QUEUE; only DRAFT (approval path) and QUEUE are exempt here.
+    if (action === 'schedule' && getPostById.state !== 'DRAFT' && getPostById.state !== 'QUEUE') {
+      await this._brandApproval.assertCanQueue(orgId, [{ integrationId: getPostById.integrationId }]);
+    }
+    // <<< SANAD-BRANDS
 
     // schedule: Set status to QUEUE and change date (reschedule the post)
     // update: Just change the date without changing the status

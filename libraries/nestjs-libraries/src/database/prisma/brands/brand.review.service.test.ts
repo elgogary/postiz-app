@@ -98,7 +98,9 @@ test('create draft links the new Postiz post to the planned brief', async () => 
   const { svc, calls } = setup({ role: 'create', brief: { postId: null } });
   const res = await svc.createDraft(...args, 'b1', { date: FUTURE.toISOString() });
   assert.equal(res.postId, 'pNew');
-  assert.deepEqual(calls.at(-1), ['updateBrief', 'b1', { postId: 'pNew' }]);
+  assert.deepEqual(calls.at(-1), ['updateBrief', 'b1', {
+    postId: 'pNew', review: 'NONE', sentById: null, sentAt: null, decidedById: null, decidedAt: null, ownCheckedBy: null, listCheckedBy: null,
+  }]);
 });
 
 test('a comment on a slide is pinned in the brief; a viewer cannot comment', async () => {
@@ -116,4 +118,9 @@ test('a new date must be in the future and only for a post not yet scheduled', a
   const { svc, calls } = setup({ role: 'create' });
   await svc.newDate(...args, 'p1', { date: FUTURE.toISOString() });
   assert.deepEqual(calls[0], ['changeDate', 'o', 'p1', FUTURE.toISOString(), 'update']);
+});
+
+test('a published poll is not marked published again', async () => {
+  const { svc } = setup({ role: 'approve', state: 'PUBLISHED', brief: { format: 'Poll' } });
+  await assert.rejects(svc.markPublished(...args, 'p1'), (e) => e instanceof BadRequestException && /already published/.test(e.message));
 });

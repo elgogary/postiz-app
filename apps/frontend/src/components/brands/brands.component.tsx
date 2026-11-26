@@ -41,6 +41,7 @@ export const Brands: FC = () => {
   const [brand, setBrand] = useState<BrandDetail | null>(null);
   const [posts, setPosts] = useState<BrandPosts | null>(null);
   const [failed, setFailed] = useState(false);
+  const [postsFailed, setPostsFailed] = useState(false);
   const current = params.get('brand') || brands?.[0]?.id || '';
   const tab = params.get('tab') || 'overview';
   const filter = params.get('filter') || 'all';
@@ -69,11 +70,15 @@ export const Brands: FC = () => {
     try {
       const list = await api.list();
       const id = wantedRef.current || list[0]?.id;
-      const [detail, cards] = id ? await Promise.all([api.get(id), api.posts(id)]) : [null, null];
+      // The posts read must not fail the brand page: its tabs say so and offer a retry.
+      const [detail, cards] = id
+        ? await Promise.all([api.get(id), api.posts(id).catch(() => undefined)])
+        : [null, null];
       if (mine !== seq.current) return;
       setBrands(list);
       setBrand(detail);
-      setPosts(cards);
+      setPosts(cards ?? null);
+      setPostsFailed(cards === undefined);
       setFailed(false);
     } catch (e) {
       if (mine !== seq.current) return;
@@ -126,7 +131,16 @@ export const Brands: FC = () => {
       );
     }
     if (tab === 'posts' || tab === 'calendar' || tab === 'mix') {
-      if (!posts) return <div className="text-customColor18">{t('loading', 'Loading…')}</div>;
+      if (!posts) {
+        return postsFailed
+          ? (
+            <div className="flex items-center gap-[16px] text-[14px] text-customColor18">
+              {t('posts_load_failed', 'Could not load the posts.')}
+              <button className="text-[13px] font-[600] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] border border-fifth" onClick={load}>{t('try_again', 'Try again')}</button>
+            </div>
+          )
+          : <div className="text-customColor18">{t('loading', 'Loading…')}</div>;
+      }
       if (tab === 'posts') {
         return <BrandPostsTab key={key} brandId={b.id} data={posts} filter={filter} focus={focus}
           setFilter={(f) => go({ tab: 'posts', filter: f })} onChanged={load} goChecks={() => go({ tab: 'review' })} onNew={newPost} />;
