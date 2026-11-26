@@ -19,7 +19,7 @@ export interface BrandPosts {
 export interface PostComment { id: string; by: string; text: string; at: string; slide: number | null }
 
 export const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-GB', {
-  weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+  weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 });
 export const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 

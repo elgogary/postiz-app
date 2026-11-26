@@ -24,7 +24,7 @@ export const BrandPostsTab: FC<{
       <div className="flex flex-wrap gap-[8px]">
         {FILTERS.map((f) => (
           <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}
-            className={`text-[13px] px-[12px] h-[32px] [@media(max-width:480px)]:h-[44px] rounded-[6px] border ${filter === f ? 'border-[#612BD3] text-[#612BD3] bg-[#612BD3]/10' : 'border-fifth'}`}>
+            className={`text-[13px] px-[12px] h-[32px] [@media(max-width:480px)]:h-[44px] rounded-[6px] border ${filter === f ? 'border-[#612BD3] text-[#5221b8] dark:text-[#c4b5fd] bg-[#612BD3]/10' : 'border-fifth'}`}>
             {f === 'all' ? t('all', 'All') : t(`state_${f}`, STATE_LABEL[f])} {count(f)}
           </button>
         ))}

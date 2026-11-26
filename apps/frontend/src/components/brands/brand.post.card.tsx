@@ -14,10 +14,14 @@ import { useMediaDialog } from './brand.media.dialog';
 import { usePostEditor } from './post.editor';
 
 const CHIP = 'text-[12px] px-[8px] py-[2px] rounded-[6px] border';
-const STATE_CHIP: Record<string, string> = {
-  review: 'border-[#612BD3]/30 bg-[#612BD3]/10 text-[#612BD3]', changes: 'border-[#e67700]/30 bg-[#e67700]/10 text-[#b35c00]',
-  scheduled: 'border-[#2b8a3e]/30 bg-[#2b8a3e]/10 text-[#2b8a3e]', error: 'border-[#c92a2a]/30 bg-[#c92a2a]/10 text-[#c92a2a]',
+// Text tones pass 4.5:1 on their 10% tint in light mode and on Postiz's dark surface (dark: variant).
+const TONE = {
+  purple: 'border-[#612BD3]/30 bg-[#612BD3]/10 text-[#5221b8] dark:text-[#c4b5fd]',
+  amber: 'border-[#e67700]/30 bg-[#e67700]/10 text-[#8f4700] dark:text-[#ffc078]',
+  green: 'border-[#2b8a3e]/30 bg-[#2b8a3e]/10 text-[#1f6f30] dark:text-[#8ce99a]',
+  red: 'border-[#c92a2a]/30 bg-[#c92a2a]/10 text-[#a51d1d] dark:text-[#ffa8a8]',
 };
+const STATE_CHIP: Record<string, string> = { review: TONE.purple, changes: TONE.amber, scheduled: TONE.green, error: TONE.red };
 const BTN = 'text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] disabled:opacity-50';
 const PRIMARY = `${BTN} bg-[#612BD3] text-white`;
 const QUIET = `${BTN} border border-fifth`;
@@ -81,9 +85,9 @@ export const BrandPostCard: FC<{
         <span className="text-customColor18">· {t(`format_${c.format.toLowerCase()}`, c.format)}</span>
         {c.goal && <span className={`${CHIP} border-fifth`}>{c.goal}</span>}
         <span className={`${CHIP} ${STATE_CHIP[c.state] || 'border-fifth'}`}>{t(`state_${c.state}`, STATE_LABEL[c.state])}</span>
-        {passed && <span className={`${CHIP} border-[#c92a2a]/30 bg-[#c92a2a]/10 text-[#c92a2a]`}>{t('date_passed_pick', 'Date passed · pick a new date')}</span>}
-        {dueSoon(c, now) && <span className={`${CHIP} border-[#c92a2a]/30 bg-[#c92a2a]/10 text-[#c92a2a]`}>{t('due_soon', 'due soon')}</span>}
-        {c.firstDraft && ['draft', 'changes', 'review'].includes(c.state) && <span className={`${CHIP} border-[#e67700]/30 bg-[#e67700]/10 text-[#b35c00]`}>{t('first_draft_check', 'First draft · check it')}</span>}
+        {passed && <span className={`${CHIP} ${TONE.red}`}>{t('date_passed_pick', 'Date passed · pick a new date')}</span>}
+        {dueSoon(c, now) && <span className={`${CHIP} ${TONE.red}`}>{t('due_soon', 'due soon')}</span>}
+        {c.firstDraft && ['draft', 'changes', 'review'].includes(c.state) && <span className={`${CHIP} ${TONE.amber}`}>{t('first_draft_check', 'First draft · check it')}</span>}
       </div>
       <div>
         <h4 dir={dirOf(c.title)} className="text-[15px] font-[600]">{c.title}</h4>
@@ -91,7 +95,7 @@ export const BrandPostCard: FC<{
       </div>
 
       {missing ? (
-        <div className="border border-dashed border-[#e67700] rounded-[8px] p-[12px] text-[13px] text-[#b35c00] flex flex-wrap items-center gap-[8px]">
+        <div id={`media-${c.key}`} className="border border-dashed border-[#e67700] rounded-[8px] p-[12px] text-[13px] text-[#8f4700] dark:text-[#ffc078] flex flex-wrap items-center gap-[8px]">
           {t(`media_missing_${c.format.toLowerCase()}`, MEDIA_HINT[c.format] || 'Add the media first')}
           {canWrite && c.group && <button className={QUIET} onClick={() => editor.openExisting(c.group!, onChanged)}>{t('open_in_editor', 'Open in editor')}</button>}
         </div>
@@ -134,11 +138,10 @@ export const BrandPostCard: FC<{
         {actions.map((a) => {
           const block = blockOf(a, c, now, ticks);
           return (
-            <button key={a} disabled={busy || block !== ''} aria-describedby={a === 'approve' ? `hint-${c.key}` : undefined}
+            <button key={a} disabled={busy || block !== ''} aria-describedby={a === 'approve' ? `hint-${c.key}` : block === 'media' ? `media-${c.key}` : undefined}
               className={primary.includes(a) ? PRIMARY : QUIET} onClick={go[a]}>{label[a]}</button>
           );
         })}
-        {actions.some((a) => blockOf(a, c, now) === 'media') && <span className="text-[12px] text-[#b35c00]">{t(`media_missing_${c.format.toLowerCase()}`, MEDIA_HINT[c.format] || '')}</span>}
         {canWrite && c.group && ['draft', 'changes'].includes(c.state) && !missing && <button className={QUIET} onClick={() => editor.openExisting(c.group!, onChanged)}>{t('open_in_editor', 'Open in editor')}</button>}
         {(c.caption || c.slides.length > 0) && <button className={QUIET} aria-expanded={open} onClick={onToggle}>{t('brief', 'Brief')}</button>}
         {c.postId && c.state !== 'published' && (
