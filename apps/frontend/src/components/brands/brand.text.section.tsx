@@ -48,7 +48,7 @@ const readable = (html: string): { html: string; dir: 'rtl' | 'ltr' } => {
     return island;
   })));
   let row: Element | null = null;
-  [...root.children].forEach((el) => {
+  Array.from(root.children).forEach((el) => {
     const m = el.tagName === 'P' ? SWATCH.exec(el.textContent || '') : null;
     if (!m) { row = null; return; }
     if (!row) { row = doc.createElement('div'); row.className = 'swatches'; el.before(row); }
