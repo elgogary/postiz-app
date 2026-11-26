@@ -33,9 +33,27 @@ export class BrandsService {
     if (!isOrgAdmin(orgRole)) throw new ForbiddenException('Only an admin can change this');
   }
 
+  // One read of everything a brand route needs: the org check, the caller's role, the approval switch, the channels.
+  async context(orgId: string, userId: string, orgRole: OrgRole, customerId: string) {
+    const customer = await this.mustCustomer(orgId, customerId);
+    const [roleOf, settings, channels, sections] = await Promise.all([
+      this.roles(orgId, userId, orgRole), this._repo.settings(orgId), this._repo.channels(orgId), this._repo.sections(orgId, customerId),
+    ]);
+    const rows = (k: string) => (sections.find((s) => s.key === k)?.rows as string[][] | null) || [];
+    return {
+      customer,
+      role: roleOf(customerId),
+      requiresApproval: settings.find((s) => s.customerId === customerId)?.requiresApproval ?? true,
+      channels: channels.filter((c) => c.customerId === customerId),
+      focusRows: rows('focus'),
+      checks: rows('review').length,
+    };
+  }
+
   async list(orgId: string, userId: string, orgRole: OrgRole) {
-    const [customers, channels, settings, roleOf] = await Promise.all([
+    const [customers, channels, settings, roleOf, open] = await Promise.all([
       this._repo.customers(orgId), this._repo.channels(orgId), this._repo.settings(orgId), this.roles(orgId, userId, orgRole),
+      this._posts.waiting(orgId),
     ]);
     const approval = new Map(settings.map((s) => [s.customerId, s.requiresApproval]));
     return customers.map((c) => ({
@@ -45,6 +63,9 @@ export class BrandsService {
         .map((ch) => ({ id: ch.id, name: ch.name, provider: ch.providerIdentifier, picture: ch.picture })),
       role: roleOf(c.id),
       requiresApproval: approval.get(c.id) ?? true,
+      waiting: open.filter((w) => w.customerId === c.id && (
+        roleOf(c.id) === 'approve' ? w.review === 'IN_REVIEW'
+          : roleOf(c.id) === 'create' ? w.review === 'SENT_BACK' && w.sentById === userId : false)).length,
     }));
   }
 

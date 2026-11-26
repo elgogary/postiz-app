@@ -35,6 +35,7 @@ import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/bran
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandPostsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.posts.repository';
 import { BrandApprovalService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.approval.service';
+import { BrandReviewService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.review.service';
 // <<< SANAD-BRANDS
 import { SignatureRepository } from '@gitroom/nestjs-libraries/database/prisma/signatures/signature.repository';
 import { SignatureService } from '@gitroom/nestjs-libraries/database/prisma/signatures/signature.service';
@@ -84,6 +85,7 @@ import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/adm
     BrandsService,
     BrandPostsRepository,
     BrandApprovalService,
+    BrandReviewService,
     // <<< SANAD-BRANDS
     IntegrationService,
     IntegrationRepository,
