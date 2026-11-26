@@ -1033,3 +1033,44 @@ model ContentIdea {
 }
 // <<< SANAD-ENGAGEMENT
 
+
+// >>> SANAD-BRANDS: brand hub tables (fork-only). customerId and userId are plain strings: no relation to upstream
+// models, so upstream syncs never conflict. Every row carries orgId; the service scopes every query by it.
+model BrandSection {
+  id          String   @id @default(uuid())
+  orgId       String
+  customerId  String
+  key         String
+  content     String?
+  rows        Json?
+  note        String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([customerId, key])
+  @@index([orgId])
+}
+
+model BrandAccess {
+  id         String   @id @default(uuid())
+  orgId      String
+  customerId String
+  userId     String
+  role       String
+  updatedAt  DateTime @updatedAt
+
+  @@unique([customerId, userId])
+  @@index([orgId])
+}
+
+model BrandSettings {
+  id               String   @id @default(uuid())
+  orgId            String
+  customerId       String   @unique
+  requiresApproval Boolean  @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@index([orgId])
+}
+// <<< SANAD-BRANDS

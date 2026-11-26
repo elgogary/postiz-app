@@ -60,6 +60,13 @@ async function start() {
     json({ limit: '50mb' })(req, res, next);
   });
 
+  // >>> SANAD-BRANDS: wrapped like the line above. A bare json() is named jsonParser, and Nest then skips its own
+  // global JSON parser, so every other route (login included) receives an empty body.
+  app.use('/brands', (req: any, res: any, next: any) => {
+    json({ limit: '5mb' })(req, res, next);
+  });
+  // <<< SANAD-BRANDS
+
   app.use(cookieParser());
   app.use(compression());
   app.useGlobalFilters(new SubscriptionExceptionFilter());

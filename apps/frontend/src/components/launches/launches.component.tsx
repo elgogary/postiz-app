@@ -360,7 +360,8 @@ export const LaunchesComponent = () => {
   const t = useT();
   const [reload, setReload] = useState(false);
   const [collapseMenu, setCollapseMenu] = useCookie('collapseMenu', '0');
-  const [mode] = useCookie('mode', 'dark');
+  // SANAD-BRANDS: light mode by default
+  const [mode] = useCookie('mode', 'light');
   const { isLoading, data: integrations, mutate } = useIntegrationList();
 
   const totalNonDisabledChannels = useMemo(() => {
