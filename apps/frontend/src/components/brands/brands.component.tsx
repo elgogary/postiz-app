@@ -153,7 +153,7 @@ export const Brands: FC = () => {
         </BrandMix>
       );
     }
-    if (tab === 'ideas') return <IdeasList key={key} scope={b.id} />;
+    if (tab === 'ideas') return <IdeasList key={key} scope={b.id} onPlanned={load} />;
     if (tab === 'summary') {
       return (
         <div key={key} className="flex flex-col gap-[24px]">

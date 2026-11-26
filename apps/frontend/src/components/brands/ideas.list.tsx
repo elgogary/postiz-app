@@ -18,7 +18,8 @@ const COLORS = ['#3b5bdb', '#0b7285', '#2b8a3e', '#c2255c', '#b35c00', '#5f3dc4'
 const initials = (name: string) => name.split(/\s+/).filter((w) => /\p{L}/u.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 const QUIET = 'text-[13px] px-[12px] h-[32px] [@media(max-width:480px)]:h-[44px] rounded-[6px] border border-fifth';
 
-export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
+// onPlanned: the brand page reloads its posts after Plan it, so the new planned post shows on Posts at once.
+export const IdeasList: FC<{ scope: string; onPlanned?: () => void }> = ({ scope, onPlanned }) => {
   const t = useT();
   const api = useBrandsApi();
   const { show } = useToaster();
@@ -65,7 +66,7 @@ export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
   });
   const plan = (idea: IdeaView) => modals.openModal({
     title: t('plan_this_idea', 'Plan this idea'), closeOnClickOutside: false, closeOnEscape: true,
-    children: (close: () => void) => <IdeaPlan data={data} idea={idea} brandId={brandId} close={close} onDone={load} />,
+    children: (close: () => void) => <IdeaPlan data={data} idea={idea} brandId={brandId} close={close} onDone={() => { load(); onPlanned?.(); }} />,
   });
   const setIdeaStatus = async (idea: IdeaView, next: 'DROPPED' | 'NEW') => {
     setBusyId(idea.id);
