@@ -82,6 +82,14 @@ test('pillars: the plan\'s own short forms fold into its full names; nothing els
   assert.deepEqual(parsePlan(page('AI')).rows.pillars, [['AI']]);
 });
 
+test('pillars: a short form with two possible full names stays as written, whatever the post order', () => {
+  const page = (...pillars: string[]) => withScript(`const GOALS={};const WEEKS=[];const P=[${pillars.map((p) => `{n:1,date:"2026-11-15",pillar:"${p}"}`).join(',')}];`);
+  assert.deepEqual(parsePlan(page('Data', 'Data Mesh', 'Data Lake')).rows.pillars, [['Data'], ['Data Mesh'], ['Data Lake']]);
+  const a = parsePlan(page('DM', 'Digital Marketing', 'Data Mesh')).rows.pillars;
+  const b = parsePlan(page('Data Mesh', 'Digital Marketing', 'DM')).rows.pillars;
+  assert.ok(a.some(([p]) => p === 'DM') && b.some(([p]) => p === 'DM'));
+});
+
 test('a malformed post gives a plain "Not plan data" error', () => {
   const bad = (post: string) => withScript(`const GOALS={};const WEEKS=[];const P=[${post}];`);
   assert.throws(() => parsePlan(bad('{n:1,date:"2026-11-15"}')), /Not plan data: post 1 is missing pillar/);

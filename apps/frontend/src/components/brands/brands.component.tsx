@@ -47,12 +47,15 @@ export const Brands: FC = () => {
   const notify = useRef({ show, t });
   notify.current = { show, t };
   const wanted = params.get('brand') || '';
+  // A reload started by a save in brand A must fetch the brand open now, not A: read the URL brand from a ref.
+  const wantedRef = useRef(wanted);
+  wantedRef.current = wanted;
 
   const load = useCallback(async () => {
     const mine = ++seq.current;
     try {
       const list = await api.list();
-      const id = wanted || list[0]?.id;
+      const id = wantedRef.current || list[0]?.id;
       const detail = id ? await api.get(id) : null;
       if (mine !== seq.current) return;
       setBrands(list);
@@ -64,9 +67,9 @@ export const Brands: FC = () => {
       setFailed(true);
       notify.current.show(errorText(e, notify.current.t), 'warning');
     }
-  }, [api, wanted]);
+  }, [api]);
 
-  useEffect(() => { load(); return () => { seq.current += 1; }; }, [load]);
+  useEffect(() => { load(); return () => { seq.current += 1; }; }, [load, wanted]);
 
   if (!brands) return <div className="p-[24px] text-customColor18">{t('loading', 'Loading…')}</div>;
   if (failed && !brands.length) {

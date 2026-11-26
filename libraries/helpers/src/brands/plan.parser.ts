@@ -172,8 +172,11 @@ const pillarTokens = (pillar: string) => pillar.split('·').map((x) => x.trim())
 function pillarNames(posts: { pillar: string }[]): (token: string) => string {
   const all = [...new Set(posts.flatMap((p) => pillarTokens(p.pillar)))];
   const initials = (x: string) => x.split(/\s+/).map((w) => w[0]).join('').toUpperCase();
-  return (token) => all.find((long) => long.length > token.length && (initials(long) === token.toUpperCase()
-    || long.toLowerCase().startsWith(`${token.toLowerCase()} `))) || token;
+  return (token) => {
+    const longer = all.filter((long) => long.length > token.length && (initials(long) === token.toUpperCase()
+      || long.toLowerCase().startsWith(`${token.toLowerCase()} `)));
+    return longer.length === 1 ? longer[0] : token;
+  };
 }
 
 function benchRow(r: string[]): string[] {
