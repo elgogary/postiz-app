@@ -44,6 +44,7 @@ test('tags map to brands by name or by the map sent in the request; short or unk
   assert.deepEqual(mapTagsToBrands(['JDCo'], brands, { jdco: 'nope' }), []);
   const acme = [{ id: '1', name: 'Acme Systems' }, { id: '2', name: 'Acme' }];
   assert.deepEqual(mapTagsToBrands(['acme'], acme), ['2']);
+  assert.deepEqual(mapTagsToBrands(['acme'], [{ id: '1', name: 'Acme Systems' }, { id: '3', name: 'Acme Labs' }]), []);
 });
 
 test('topic comes from the first topic tag, else AI, else General', () => {

@@ -4,8 +4,8 @@ import {
 } from 'class-validator';
 
 export class IdeaDto {
-  @IsString() @MaxLength(500) hook: string;
-  @IsOptional() @IsString() @MaxLength(2000) angle?: string;
+  @IsString() @MaxLength(1000) hook: string;
+  @IsOptional() @IsString() @MaxLength(5000) angle?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) bullets?: string[];
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) brandIds?: string[];
   @IsOptional() @IsString() @MaxLength(100) topic?: string;

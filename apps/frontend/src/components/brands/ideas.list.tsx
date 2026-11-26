@@ -142,9 +142,13 @@ export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
                 <div className="flex items-start gap-[8px] shrink-0">
                   {planned ? (
                     <button className={`${QUIET.replace(' h-[32px] [@media(max-width:480px)]:h-[44px]', '')} min-h-[32px] [@media(max-width:480px)]:min-h-[44px] py-[4px] text-start`} onClick={() => router.push(`/brands?brand=${planned.brandId}&tab=posts&focus=${encodeURIComponent(`b:${i.briefId}`)}`)}>
-                      {plannedBrand
-                        ? t('planned_on_brand', 'Planned · {day} · {brand}').replace('{day}', new Date(planned.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })).replace('{brand}', plannedBrand)
-                        : t('planned_plain', 'Planned')}
+                      {(() => {
+                        const day = new Date(planned.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+                        const posted = i.status === 'POSTED';
+                        if (!plannedBrand) return posted ? t('posted_on_day', 'Posted · {day}').replace('{day}', day) : t('planned_on_day', 'Planned · {day}').replace('{day}', day);
+                        return (posted ? t('posted_on_brand', 'Posted · {day} · {brand}') : t('planned_on_brand', 'Planned · {day} · {brand}'))
+                          .replace('{day}', day).replace('{brand}', plannedBrand);
+                      })()}
                     </button>
                   ) : write ? (
                     <>

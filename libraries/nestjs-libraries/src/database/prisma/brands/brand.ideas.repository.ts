@@ -43,6 +43,14 @@ export class BrandIdeasRepository {
     return r.count === 1;
   }
 
+  // Drop and Restore change the status only from the one it was read in, and never on a planned idea.
+  async moveStatus(orgId: string, id: string, from: string, to: string) {
+    const r = await this._prisma.model.contentIdea.updateMany({
+      where: { id, organizationId: orgId, deletedAt: null, status: from, briefId: null }, data: { status: to },
+    });
+    return r.count === 1;
+  }
+
   updateOp(orgId: string, id: string, data: Prisma.ContentIdeaUncheckedUpdateManyInput) {
     return this._prisma.model.contentIdea.updateMany({ where: { id, organizationId: orgId, deletedAt: null }, data });
   }

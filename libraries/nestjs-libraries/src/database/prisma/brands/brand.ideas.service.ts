@@ -44,7 +44,11 @@ export class BrandIdeasService {
   // create on any brand.
   private mayWrite(brands: Brand[], brandIds: string[]) {
     const ids = brandIds.length ? brandIds : brands.map((b) => b.id);
-    return ids.some((id) => canEdit(brands.find((b) => b.id === id)?.role as BrandRole));
+    return ids.some((id) => this.writable(brands, id));
+  }
+
+  private writable(brands: Brand[], id: string) {
+    return canEdit(brands.find((b) => b.id === id)?.role as BrandRole);
   }
 
   private fields(brands: Brand[], dto: IdeaDto): IdeaFields {
@@ -82,7 +86,9 @@ export class BrandIdeasService {
   async create(orgId: string, userId: string, orgRole: OrgRole, dto: IdeaDto) {
     const brands = await this.brandsOf(orgId, userId, orgRole);
     const f = this.fields(brands, dto);
-    if (!this.mayWrite(brands, f.brandIds)) throw new ForbiddenException('You can view these brands but not add ideas');
+    // Every brand ticked must be one the person may create on, so an idea never lands on a brand they only view.
+    const ok = f.brandIds.length ? f.brandIds.every((b) => this.writable(brands, b)) : this.mayWrite(brands, []);
+    if (!ok) throw new ForbiddenException('You can view these brands but not add ideas');
     const row = await this._repo.create({
       organizationId: orgId, idea: composeIdeaText(f), source: f.source || null, tags: [], note: null,
       hook: f.hook, angle: f.angle, bullets: f.bullets, brandIds: f.brandIds, topic: f.topic, pillars: f.pillars, format: f.format, status: 'NEW',
@@ -95,7 +101,12 @@ export class BrandIdeasService {
     const row = await this._repo.idea(orgId, id);
     if (!row) throw new NotFoundException('Idea not found');
     const f = this.fields(brands, dto);
-    if (!this.mayWrite(brands, row.brandIds) || !this.mayWrite(brands, f.brandIds)) throw new ForbiddenException('You can view this idea but not change it');
+    const added = f.brandIds.filter((b) => !row.brandIds.includes(b));
+    if (!this.mayWrite(brands, row.brandIds) || added.some((b) => !this.writable(brands, b))) {
+      throw new ForbiddenException('You can view this idea but not change it');
+    }
+    const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+    if (row.briefId && !same(f.brandIds, row.brandIds)) throw new BadRequestException('A planned idea keeps its brands');
     const saved = await this._repo.update(orgId, id, {
       idea: composeIdeaText(f), source: f.source || null, hook: f.hook, angle: f.angle, bullets: f.bullets, brandIds: f.brandIds,
       topic: f.topic, pillars: f.pillars, format: f.format,
@@ -111,7 +122,9 @@ export class BrandIdeasService {
     const now = (await this.view(orgId, row)).status;
     if (status === 'DROPPED' && now !== 'NEW') throw new BadRequestException('Only a new idea can be dropped');
     if (status === 'NEW' && now !== 'DROPPED') throw new BadRequestException('Only a dropped idea can be restored');
-    await this._repo.update(orgId, id, { status });
+    if (!(await this._repo.moveStatus(orgId, id, status === 'DROPPED' ? 'NEW' : 'DROPPED', status))) {
+      throw new BadRequestException('This idea changed a moment ago');
+    }
     return { ok: true };
   }
 

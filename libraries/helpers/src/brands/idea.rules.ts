@@ -69,7 +69,9 @@ export const mapTagsToBrands = (tags: string[], brands: { id: string; name: stri
     const mapped = Object.entries(extra).find(([k]) => norm(k) === key)?.[1];
     if (mapped && brands.some((b) => b.id === mapped)) { add(mapped); continue; }
     if (key.length < 3) continue;
-    const hit = brands.find((b) => norm(b.name) === key) || brands.find((b) => norm(b.name).startsWith(key));
+    // A prefix counts only when it names one brand; two brands starting the same way need the sent map.
+    const prefixed = brands.filter((b) => norm(b.name).startsWith(key));
+    const hit = brands.find((b) => norm(b.name) === key) || (prefixed.length === 1 ? prefixed[0] : undefined);
     if (hit) add(hit.id);
   }
   return out;

@@ -29,6 +29,7 @@ function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: 
     create: async (data: Record<string, unknown>) => { calls.push(['create', data]); return { ...ideaRow(), ...data, id: 'new' }; },
     update: async (_o: string, id: string, data: Record<string, unknown>) => { calls.push(['update', id, data]); return { ...rows.find((r) => r.id === id), ...data }; },
     claim: async (_o: string, id: string, briefId: string, brandIds: string[]) => { calls.push(['claim', id, briefId, brandIds]); return opts.claimed !== false; },
+    moveStatus: async (_o: string, id: string, _from: string, to: string) => { calls.push(['moveStatus', id, { status: to }]); return true; },
     updateOp: (_o: string, id: string, data: Record<string, unknown>) => { calls.push(['updateOp', id, data]); return {}; },
     saveAll: async (ops: unknown[]) => { calls.push(['saveAll', ops.length]); return []; },
     plans: async () => [{ briefId: 'b9', brandId: 'acc', date: FUTURE, postId: 'p9', postState: 'PUBLISHED' }],
@@ -59,6 +60,7 @@ test('add needs a hook and a brand the person may create on; it stores the field
   const s = setup();
   await assert.rejects(s.svc.create(...s.args, { hook: '  ', brandIds: ['acc'] }), BadRequestException);
   await assert.rejects(s.svc.create(...s.args, { hook: 'H', brandIds: ['opt'] }), ForbiddenException);
+  await assert.rejects(s.svc.create(...s.args, { hook: 'H', brandIds: ['acc', 'opt'] }), ForbiddenException);
   await assert.rejects(s.svc.create(...s.args, { hook: 'H', brandIds: ['zzz'] }), BadRequestException);
   await s.svc.create(...s.args, { hook: ' H ', angle: 'A', bullets: ['b', ' '], brandIds: ['acc'], topic: 'Nope', format: 'Reel' });
   const data = s.calls[0][1] as Record<string, unknown>;
@@ -68,6 +70,15 @@ test('add needs a hook and a brand the person may create on; it stores the field
   assert.equal(data.format, '');
   assert.equal(data.idea, 'Hook: H\nAngle: A\nBullets:\n- b');
   assert.equal(data.status, 'NEW');
+});
+
+test('edit: a view-only brand cannot be added; a planned idea keeps its brands', async () => {
+  const s = setup({ rows: [ideaRow(), ideaRow({ id: 'i2', status: 'PLANNED', briefId: 'b1' })] });
+  await assert.rejects(s.svc.update(...s.args, 'i1', { hook: 'H', brandIds: ['acc', 'opt'] }), ForbiddenException);
+  await assert.rejects(s.svc.update(...s.args, 'i2', { hook: 'H', brandIds: [] }), BadRequestException);
+  await s.svc.update(...s.args, 'i2', { hook: 'H2', brandIds: ['acc'] });
+  assert.equal((s.calls.at(-1)?.[2] as { hook: string }).hook, 'H2');
+  await assert.rejects(setup({ role: 'view' }).svc.update('o', 'u1', 'USER', 'i1', { hook: 'H', brandIds: ['acc'] }), ForbiddenException);
 });
 
 test('drop only a new idea; restore only a dropped one', async () => {
