@@ -88,7 +88,8 @@ export const actionsFor = (role: BrandRole, requiresApproval: boolean, c: Card, 
   if (c.state === 'planned' && create) out.push('createDraft');
   if ((c.state === 'draft' || c.state === 'changes') && create) out.push(requiresApproval ? 'sendForReview' : 'schedule');
   if (c.state === 'review' && approve) out.push('approve', 'sendBack');
-  if ((c.state === 'review' || c.state === 'scheduled') && approve) out.push('stop');
+  // A failed post (ERROR) goes back to Draft through Stop, then through review again (rule 2 has no other way back).
+  if ((c.state === 'review' || c.state === 'scheduled' || c.state === 'error') && approve) out.push('stop');
   if (c.format === 'Poll' && approve && (c.state === 'draft' || c.state === 'review' || c.state === 'scheduled')) out.push('markPublished');
   return out;
 };

@@ -56,6 +56,8 @@ test('actions per role and approval setting', () => {
   assert.deepEqual(actionsFor('create', true, card({ state: 'review' }), NOW), []);
   assert.deepEqual(actionsFor('approve', true, card({ state: 'review' }), NOW), ['approve', 'sendBack', 'stop']);
   assert.deepEqual(actionsFor('approve', true, card({ state: 'scheduled' }), NOW), ['stop']);
+  assert.deepEqual(actionsFor('approve', true, card({ state: 'error' }), NOW), ['stop']);
+  assert.deepEqual(actionsFor('create', true, card({ state: 'error' }), NOW), []);
   assert.deepEqual(actionsFor('create', true, card({ state: 'changes', date: '2026-11-20T09:00:00Z' }), NOW), ['newDate', 'sendForReview']);
   assert.deepEqual(actionsFor('approve', true, card({ state: 'draft', format: 'Poll' }), NOW), ['sendForReview', 'markPublished']);
 });
