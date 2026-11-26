@@ -23,7 +23,8 @@ const asRow = (r: ContentIdea): IdeaRow => ({
   format: r.format, status: r.status, briefId: r.briefId,
 });
 
-const DAY = 86400000;
+const SKEW = 5 * 60000;
+const HOUR = 3600000;
 const MIGRATE_CHUNK = 500;
 
 const list20 = (v: string[] | undefined) => (v || []).map((x) => x.trim()).filter(Boolean).slice(0, 20);
@@ -156,8 +157,12 @@ export class BrandIdeasService {
     if (idea.brandIds.length && !idea.brandIds.includes(dto.customerId)) throw new BadRequestException('This idea is not for this brand');
     const when = Date.parse(dto.date);
     if (Number.isNaN(when)) throw new BadRequestException('Pick the date');
-    // A day picked as a bare date parses as UTC midnight; the day of grace keeps "today" valid in every time zone.
-    if (when < Date.now() - DAY) throw new BadRequestException('Pick a date that has not passed');
+    // A bare day (YYYY-MM-DD) is a calendar day: valid while it is still that day somewhere (UTC-12). A full time must
+    // not have passed, with a few minutes for clock drift.
+    const passed = /^\d{4}-\d{2}-\d{2}$/.test(dto.date)
+      ? dto.date < new Date(Date.now() - 12 * HOUR).toISOString().slice(0, 10)
+      : when < Date.now() - SKEW;
+    if (passed) throw new BadRequestException('Pick a date that has not passed');
     const briefId = randomUUID();
     const brandIds = idea.brandIds.includes(dto.customerId) ? idea.brandIds : [...idea.brandIds, dto.customerId];
     if (!(await this._repo.claim(orgId, id, briefId, brandIds))) throw new BadRequestException('This idea was planned a moment ago');
@@ -167,15 +172,18 @@ export class BrandIdeasService {
         sub: idea.angle, slides: idea.bullets, pillars: idea.pillars,
       });
     } catch (e) {
-      await this._repo.update(orgId, id, { status: 'NEW', briefId: null, brandIds: idea.brandIds }).catch(() => undefined);
+      await this._repo.update(orgId, id, { status: 'NEW', briefId: null, brandIds: idea.brandIds })
+        .catch((r) => this._log.error(`Plan it: idea ${id} stays Planned without its brief: ${(r as Error).message}`));
       throw e;
     }
-    const firstDraft = dto.ai && ctx.channels.length > 0 && await this.firstDraft(orgId, userId, orgRole, dto, ctx.customer.name, idea, briefId);
-    return { briefId, firstDraft, aiFailed: dto.ai && !firstDraft };
+    const noChannel = ctx.channels.length === 0;
+    const firstDraft = dto.ai && !noChannel && await this.firstDraft(orgId, userId, orgRole, dto, ctx.customer.name, idea, briefId);
+    return { briefId, firstDraft, aiFailed: dto.ai && !noChannel && !firstDraft, noChannel: dto.ai && noChannel };
   }
 
   // Rule 7: any failure here (the AI, saving its text, making the Draft) leaves the idea planned and reports the draft
-  // as failed; text the AI wrote stays on the planned post, so a Draft made later from Posts starts from it.
+  // as failed; text the AI wrote stays on the planned post, so a Draft made later from Posts starts from it. The post is
+  // marked a first draft only once its Draft exists.
   private async firstDraft(orgId: string, userId: string, orgRole: OrgRole, dto: PlanIdeaDto, brand: string, idea: IdeaView, briefId: string) {
     try {
       const book = await this._brands.get(orgId, userId, orgRole, dto.customerId);
@@ -183,9 +191,10 @@ export class BrandIdeasService {
       const draft = await this._drafts.write({ brand, voice: book.sections.voice?.content || '', checks, idea, format: dto.format });
       if (!draft) return false;
       await this._posts.updateBrief(briefId, {
-        caption: draft.caption, slides: draft.slides, slidesLabel: draft.slidesLabel, verify: DRAFT_VERIFY, firstDraft: true,
+        caption: draft.caption, slides: draft.slides, slidesLabel: draft.slidesLabel, verify: DRAFT_VERIFY,
       });
       await this._review.createDraft(orgId, userId, orgRole, dto.customerId, briefId, { date: dto.date });
+      await this._posts.updateBrief(briefId, { firstDraft: true });
       return true;
     } catch (e) {
       this._log.warn(`Plan it: the first draft was not made: ${(e as Error).message}`);

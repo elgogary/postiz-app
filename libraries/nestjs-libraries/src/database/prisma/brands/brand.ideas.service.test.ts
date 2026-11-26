@@ -95,16 +95,22 @@ test('migrate: admins only; the dry run reports and writes nothing; tags map to 
 test('plan it: AI on writes a first draft; AI failing still plans; only a new idea of this brand; viewers cannot', async () => {
   const s = setup();
   const res = await s.svc.plan(...s.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Carousel', ai: true });
-  assert.deepEqual(s.calls.map((c) => c[0]), ['claim', 'createBrief', 'write', 'updateBrief', 'createDraft']);
+  assert.deepEqual(s.calls.map((c) => c[0]), ['claim', 'createBrief', 'write', 'updateBrief', 'createDraft', 'updateBrief']);
   const [, , briefId, brandIds] = s.calls[0] as [string, string, string, string[]];
-  assert.deepEqual(res, { briefId, firstDraft: true, aiFailed: false });
+  assert.deepEqual(res, { briefId, firstDraft: true, aiFailed: false, noChannel: false });
   assert.deepEqual(brandIds, ['acc']);
   assert.deepEqual([(s.calls[1][1] as { id: string }).id, (s.calls[1][1] as { ideaId: string }).ideaId], [briefId, 'i1']);
-  assert.equal((s.calls[3][2] as { firstDraft: boolean }).firstDraft, true);
+  assert.equal((s.calls[3][2] as { caption: string }).caption, 'Cap');
+  assert.equal((s.calls[3][2] as { firstDraft?: boolean }).firstDraft, undefined);
+  assert.deepEqual(s.calls[5][2], { firstDraft: true });
 
   const today = new Date().toISOString().slice(0, 10);
   assert.equal((await setup().svc.plan(...s.args, 'i1', { customerId: 'acc', date: today, format: 'Text', ai: false })).firstDraft, false);
   await assert.rejects(setup().svc.plan(...s.args, 'i1', { customerId: 'acc', date: '2020-01-01T00:00:00Z', format: 'Text', ai: false }), BadRequestException);
+  const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+  await assert.rejects(setup().svc.plan(...s.args, 'i1', { customerId: 'acc', date: twoDaysAgo, format: 'Text', ai: false }), BadRequestException);
+  const hourAgo = new Date(Date.now() - 3600000).toISOString();
+  await assert.rejects(setup().svc.plan(...s.args, 'i1', { customerId: 'acc', date: hourAgo, format: 'Text', ai: false }), BadRequestException);
 
   const lost = setup({ claimed: false });
   await assert.rejects(lost.svc.plan(...lost.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: false }), BadRequestException);
@@ -123,10 +129,11 @@ test('plan it: AI on writes a first draft; AI failing still plans; only a new id
   const n = await noDraft.svc.plan(...noDraft.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true });
   assert.deepEqual([n.firstDraft, n.aiFailed], [false, true]);
   assert.ok(noDraft.calls.some((c) => c[0] === 'updateBrief'), 'the AI text stays on the planned post');
+  assert.ok(!noDraft.calls.some((c) => c[0] === 'updateBrief' && (c[2] as { firstDraft?: boolean }).firstDraft), 'not marked a first draft without its Draft');
 
   const noChannel = setup({ channels: [] });
   const c = await noChannel.svc.plan(...noChannel.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true });
-  assert.deepEqual([c.firstDraft, c.aiFailed], [false, true]);
+  assert.deepEqual([c.firstDraft, c.aiFailed, c.noChannel], [false, false, true]);
   assert.ok(!noChannel.calls.some((x) => x[0] === 'write'), 'no AI call when there is no channel to draft on');
 
   await assert.rejects(setup({ rows: [ideaRow({ status: 'PLANNED', briefId: 'b1' })] }).svc.plan('o', 'u1', 'USER', 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: false }), BadRequestException);
