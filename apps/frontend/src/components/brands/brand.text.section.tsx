@@ -6,9 +6,8 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import type { SectionData } from './brands.api';
+import { AR, errorText, SectionData } from './brands.api';
 
-const AR = /[؀-ۿ]/;
 export const setDirections = (root: HTMLElement | null) => {
   root?.querySelectorAll('p, li, ul, ol, h3, h4, table').forEach((el) => el.setAttribute('dir', AR.test(el.textContent || '') ? 'rtl' : 'ltr'));
 };
@@ -33,7 +32,7 @@ export const BrandTextSection: FC<{
       setEditing(false);
       show(t('saved', 'Saved'), 'success');
     } catch (e) {
-      show((e as Error).message, 'warning');
+      show(errorText(e, t), 'warning');
     }
     setBusy(false);
   };
@@ -57,7 +56,7 @@ export const BrandTextSection: FC<{
       </div>
       {editing ? (
         <>
-          <div className="bg-input border border-fifth rounded-[8px] p-[16px] min-h-[200px] [&_.ProseMirror]:outline-none" dir="auto">
+          <div className="bg-input border border-fifth rounded-[8px] p-[16px] min-h-[200px] [&_.ProseMirror]:outline-none [&_.ProseMirror_:is(p,li,h3,h4)]:[unicode-bidi:plaintext] [&_.ProseMirror_:is(p,li,h3,h4)]:text-start">
             <EditorContent editor={editor} />
           </div>
           <div className="flex justify-end gap-[8px]">

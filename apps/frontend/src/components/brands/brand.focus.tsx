@@ -6,14 +6,14 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { BrandRowsSection } from './brand.rows.section';
 import type { SectionData } from './brands.api';
 
-const short = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const short = (iso: string) => (!iso ? '' : new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
 
 export const BrandFocus: FC<{ data?: SectionData; canEdit: boolean; onSave: (rows: string[][]) => Promise<void> }> = ({ data, canEdit, onSave }) => {
   const t = useT();
   const [editing, setEditing] = useState(false);
   const rows = data?.rows || [];
   if (editing) {
-    return <BrandRowsSection sectionKey="focus" label={t('focus', 'Focus')} data={data} canEdit onSave={async (r) => { await onSave(r); setEditing(false); }} />;
+    return <BrandRowsSection sectionKey="focus" label={t('focus', 'Focus')} data={data} canEdit initialEditing onDone={() => setEditing(false)} onSave={onSave} />;
   }
   return (
     <article className="bg-sixth border border-fifth rounded-[12px] p-[24px] flex flex-col gap-[16px]">
@@ -27,7 +27,7 @@ export const BrandFocus: FC<{ data?: SectionData; canEdit: boolean; onSave: (row
             <div key={i} className="border border-fifth rounded-[8px] p-[16px] flex flex-col gap-[8px]">
               <div className="flex justify-between text-[12px]">
                 <span className="px-[8px] rounded-[6px] bg-newColColor">{t('week', 'Week')} {i + 1}</span>
-                <span className="text-customColor18">{short(start)} {t('to', 'to')} {short(end)}</span>
+                <span className="text-customColor18">{[short(start), short(end)].filter(Boolean).join(` ${t('to', 'to')} `)}</span>
               </div>
               <h4 className="text-[14px] font-[600]" dir="auto">{theme}</h4>
               <p className="text-[13px] text-customColor18 leading-[1.6]" dir="auto">{desc}</p>

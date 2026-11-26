@@ -7,7 +7,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { canEdit, isRowSection, RowSectionKey } from '@gitroom/helpers/brands/brand.rules';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
-import { BrandDetail, BrandSummary, useBrandsApi } from './brands.api';
+import { BrandDetail, BrandSummary, errorText, useBrandsApi } from './brands.api';
 import { BrandConnections } from './brand.connections';
 import { BrandTextSection } from './brand.text.section';
 import { BrandRowsSection } from './brand.rows.section';
@@ -32,6 +32,7 @@ export const Brands: FC = () => {
   const params = useSearchParams();
   const [brands, setBrands] = useState<BrandSummary[] | null>(null);
   const [brand, setBrand] = useState<BrandDetail | null>(null);
+  const [failed, setFailed] = useState(false);
   const current = params.get('brand') || brands?.[0]?.id || '';
   const tab = params.get('tab') || 'overview';
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN';
@@ -47,14 +48,25 @@ export const Brands: FC = () => {
       setBrands(list);
       const id = params.get('brand') || list[0]?.id;
       setBrand(id ? await api.get(id) : null);
+      setFailed(false);
     } catch (e) {
-      show((e as Error).message, 'warning');
+      setBrands((b) => b ?? []);
+      setFailed(true);
+      show(errorText(e, t), 'warning');
     }
-  }, [params]);
+  }, [api, show, params, t]);
 
   useEffect(() => { load(); }, [load]);
 
   if (!brands) return <div className="p-[24px] text-customColor18">{t('loading', 'Loading…')}</div>;
+  if (failed && !brands.length) {
+    return (
+      <div className="p-[24px] flex items-center gap-[16px] text-[14px] text-customColor18">
+        {t('brands_load_failed', 'Could not load brands.')}
+        <button className="text-[13px] font-[600] px-[16px] h-[36px] rounded-[8px] border border-fifth" onClick={load}>{t('try_again', 'Try again')}</button>
+      </div>
+    );
+  }
   if (!brands.length) {
     return <div className="p-[24px] text-[14px] text-customColor18">{t('no_brands', 'No brands yet. Group your channels by brand: on a channel, open its menu and choose "Move / add to group".')}</div>;
   }

@@ -4,7 +4,7 @@
 import { FC, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { useBrandsApi } from './brands.api';
+import { errorText, useBrandsApi } from './brands.api';
 
 interface Summary { sections: string[]; rows: Record<string, number>; posts: number }
 
@@ -21,13 +21,13 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
     const text = await file.text();
     setHtml(text);
     setBusy(true);
-    try { setSummary(await api.importPlan(brandId, text, true)); } catch (e) { show((e as Error).message, 'warning'); setSummary(null); }
+    try { setSummary(await api.importPlan(brandId, text, true)); } catch (e) { show(errorText(e, t), 'warning'); setSummary(null); }
     setBusy(false);
   };
 
   const run = async () => {
     setBusy(true);
-    try { await api.importPlan(brandId, html, false); show(t('plan_imported', 'Plan imported'), 'success'); onDone(); close(); } catch (e) { show((e as Error).message, 'warning'); }
+    try { await api.importPlan(brandId, html, false); show(t('plan_imported', 'Plan imported'), 'success'); onDone(); close(); } catch (e) { show(errorText(e, t), 'warning'); }
     setBusy(false);
   };
 

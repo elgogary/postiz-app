@@ -3,7 +3,7 @@
 import { FC, useEffect, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { AccessPerson, useBrandsApi } from './brands.api';
+import { AccessPerson, errorText, useBrandsApi } from './brands.api';
 
 export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved: () => void }> = ({ brandId, close, onSaved }) => {
   const t = useT();
@@ -13,7 +13,7 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
   const [people, setPeople] = useState<AccessPerson[]>([]);
   const [changed, setChanged] = useState<Record<string, string>>({});
 
-  useEffect(() => { api.access(brandId).then((a) => { setApproval(a.requiresApproval); setPeople(a.people); }).catch((e) => show(e.message, 'warning')); }, [brandId]);
+  useEffect(() => { api.access(brandId).then((a) => { setApproval(a.requiresApproval); setPeople(a.people); }).catch((e) => show(errorText(e, t), 'warning')); }, [brandId]);
 
   const save = async () => {
     try {
@@ -23,7 +23,7 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
       onSaved();
       close();
     } catch (e) {
-      show((e as Error).message, 'warning');
+      show(errorText(e, t), 'warning');
     }
   };
 
@@ -45,7 +45,7 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
           {p.locked ? (
             <span className="ms-auto text-[13px] text-customColor18">{t('approves_every_brand', 'Approves every brand')}</span>
           ) : (
-            <div role="group" aria-label={`${p.name} access`} className="ms-auto inline-flex border border-fifth rounded-[8px] overflow-hidden">
+            <div role="group" aria-label={`${p.name} ${t('access', 'Access').toLowerCase()}`} className="ms-auto inline-flex border border-fifth rounded-[8px] overflow-hidden">
               {(['VIEW', 'CREATE', 'APPROVE'] as const).map((r) => {
                 const on = (changed[p.userId] || p.access) === r;
                 return (
