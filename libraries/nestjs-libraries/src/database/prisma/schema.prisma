@@ -1028,6 +1028,17 @@ model ContentIdea {
   tags           String[]  @default([])
   createdAt      DateTime  @default(now())
   deletedAt      DateTime?
+  // >>> SANAD-BRANDS: structured idea fields (Brands hub plan 3). A row whose hook is empty is read through `idea`.
+  hook           String    @default("")
+  angle          String    @default("")
+  bullets        Json      @default("[]")
+  brandIds       String[]  @default([])
+  topic          String    @default("")
+  pillars        String[]  @default([])
+  format         String    @default("")
+  status         String    @default("NEW")
+  briefId        String?
+  // <<< SANAD-BRANDS
 
   @@index([organizationId])
 }
