@@ -17,7 +17,7 @@ const Group: FC<{ title: string; tiles: Tile[]; go: (tab: string) => void }> = (
           {tile.count !== undefined && tile.count !== '' && <span className="text-[12px] px-[8px] rounded-[6px] bg-newColColor">{tile.count}</span>}
         </>
       );
-      const row = 'w-full flex items-center gap-[8px] px-[16px] min-h-[32px] text-[13px] text-start';
+      const row = 'w-full flex items-center gap-[8px] px-[16px] min-h-[32px] [@media(max-width:480px)]:min-h-[44px] text-[13px] text-start';
       // A tile without a tab is a plain row: nothing to open, so it does not look like a button.
       return tile.tab
         ? <button key={tile.label} onClick={() => go(tile.tab!)} className={`${row} hover:bg-newColColor [&+*]:border-t [&+*]:border-fifth`}>{inside}</button>

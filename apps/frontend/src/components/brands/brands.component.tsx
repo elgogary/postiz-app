@@ -114,7 +114,7 @@ export const Brands: FC = () => {
   };
 
   return (
-    <div className="flex flex-1 gap-[24px] p-[24px] bg-newBgColorInner">
+    <div className="flex flex-1 min-w-0 max-w-full gap-[24px] p-[24px] [@media(max-width:480px)]:p-[12px] bg-newBgColorInner">
       <nav aria-label={t('brands', 'Brands')} className="flex mobile:hidden flex-col gap-[4px] w-[56px] shrink-0">
         {brands.map((b, i) => (
           <button key={b.id} title={b.name} aria-label={b.name} aria-current={b.id === current} onClick={() => go({ brand: b.id })}
