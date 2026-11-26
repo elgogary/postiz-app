@@ -27,11 +27,15 @@ export const BrandComments: FC<{ brandId: string; postId: string; canWrite: bool
   const { show } = useToaster();
   const [items, setItems] = useState<PostComment[] | null>(null);
   const [text, setText] = useState('');
-  const load = useCallback(() => api.comments(brandId, postId).then(setItems).catch((e) => show(errorText(e, t), 'warning')), [api, brandId, postId]);
+  const [sending, setSending] = useState(false);
+  // A failed load shows an empty thread, not "Loading" forever.
+  const load = useCallback(() => api.comments(brandId, postId).then(setItems).catch((e) => { setItems((v) => v ?? []); show(errorText(e, t), 'warning'); }), [api, brandId, postId]);
   useEffect(() => { load(); }, [load]);
   const send = async () => {
+    setSending(true);
     try { await api.addComment(brandId, postId, text.trim()); setText(''); show(t('comment_sent', 'Comment sent'), 'success'); await load(); onChanged(); }
     catch (e) { show(errorText(e, t), 'warning'); }
+    setSending(false);
   };
   return (
     <div className="flex flex-col gap-[8px] border-t border-fifth pt-[12px]">
@@ -40,7 +44,7 @@ export const BrandComments: FC<{ brandId: string; postId: string; canWrite: bool
         <div className="flex gap-[8px] items-end">
           <textarea aria-label={t('write_a_comment', 'Write a comment')} placeholder={t('write_a_comment', 'Write a comment')} dir={dirOf(text)}
             className="flex-1 min-h-[44px] p-[8px] bg-input border border-fifth rounded-[6px] text-[13px]" value={text} onChange={(e) => setText(e.target.value)} />
-          <button disabled={!text.trim()} className="text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] border border-fifth disabled:opacity-50" onClick={send}>{t('send', 'Send')}</button>
+          <button disabled={sending || !text.trim()} className="text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] border border-fifth disabled:opacity-50" onClick={send}>{t('send', 'Send')}</button>
         </div>
       )}
     </div>
