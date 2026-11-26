@@ -22,6 +22,10 @@ export const BrandCalendar: FC<{ data: BrandPosts; onOpen: (c: Card) => void }> 
     byDay.set(d, [...(byDay.get(d) || []), c]);
   }
   const inPlan = (d: string) => d >= data.window.from && d <= data.window.to;
+  // The grid also covers any post dated outside the plan period, so the calendar never hides a counted post.
+  const days = [...byDay.keys()].sort();
+  const from = days.length && days[0] < data.window.from ? days[0] : data.window.from;
+  const to = days.length && days[days.length - 1] > data.window.to ? days[days.length - 1] : data.window.to;
   return (
     <div className="flex flex-col gap-[12px]">
       {goals.length > 0 && (
@@ -31,10 +35,10 @@ export const BrandCalendar: FC<{ data: BrandPosts; onOpen: (c: Card) => void }> 
       )}
       <div className="grid grid-cols-7 [@media(max-width:768px)]:grid-cols-1 gap-[4px]">
         {DAYS.map((d) => <div key={d} className="text-[12px] text-customColor18 px-[4px] [@media(max-width:768px)]:hidden">{t(`day_${d.toLowerCase()}`, d)}</div>)}
-        {calendarWeeks(data.window.from, data.window.to).flat().map((d) => {
+        {calendarWeeks(from, to).flat().map((d) => {
           const posts = byDay.get(d) || [];
           return (
-            <div key={d} className={`min-h-[104px] border border-fifth rounded-[6px] p-[4px] flex flex-col gap-[4px] ${inPlan(d) ? '' : 'opacity-40 [@media(max-width:768px)]:hidden'} ${posts.length ? '' : '[@media(max-width:768px)]:hidden'}`}>
+            <div key={d} className={`min-h-[104px] border border-fifth rounded-[6px] p-[4px] flex flex-col gap-[4px] ${inPlan(d) || posts.length ? '' : 'opacity-40'} ${posts.length ? '' : '[@media(max-width:768px)]:hidden'}`}>
               <div className={`text-[12px] ${d === today ? 'text-[#5221b8] dark:text-[#c4b5fd] font-[700]' : 'text-customColor18'}`}>
                 {new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
               </div>

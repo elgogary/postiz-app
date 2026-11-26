@@ -41,7 +41,7 @@ export const BrandStands: FC<{ cards: Card[]; role: BrandRole; window: { from: s
         <>
           <div className="flex items-baseline gap-[8px] flex-wrap">
             <span className="text-[24px] font-[700]">{s.published} {t('of', 'of')} {s.total}</span>
-            <span className="text-[13px] text-customColor18">{t('published_plan', 'published · plan')} {shortDate(window.from)} {t('to', 'to')} {shortDate(window.to, true)}</span>
+            <span className="text-[13px] text-customColor18">{t('published_plan_period', 'published · plan {from} to {to}').replace('{from}', shortDate(window.from)).replace('{to}', shortDate(window.to, true))}</span>
           </div>
           <div className="flex h-[16px] rounded-[6px] overflow-hidden border border-fifth" role="img"
             aria-label={SEGMENTS.map(([k]) => `${label(k)} ${n(k)}`).join(', ')}>
@@ -53,6 +53,7 @@ export const BrandStands: FC<{ cards: Card[]; role: BrandRole; window: { from: s
                 className={`text-start rounded-[8px] border p-[8px] min-h-[44px] ${hot === k && n(k) > 0 ? 'border-[#612BD3] bg-[#612BD3]/5' : 'border-fifth'}`}>
                 <div className="text-[20px] font-[700]">{n(k)}</div>
                 <div className="text-[12px]">{label(k)}</div>
+                {hot === k && n(k) > 0 && <div className="text-[11px] font-[600] text-[#5221b8] dark:text-[#c4b5fd]">{t('waiting_for_you_short', 'Waiting for you')}</div>}
                 {notes[k] && <div className={`text-[12px] ${notes[k].includes(passed) ? 'text-[#c92a2a] dark:text-[#ff8787]' : k === 'changes' || k === 'draft' ? 'text-[#b35c00] dark:text-[#ffa94d]' : 'text-customColor18'}`}>{notes[k]}</div>}
               </button>
             ))}
