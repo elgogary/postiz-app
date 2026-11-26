@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { ForbiddenException } from '@nestjs/common';
 import { BrandApprovalService } from './brand.approval.service';
 
-const fake = (posts: { id: string }[], channels: { customerId: string; name: string }[], off: string[]) => ({
+const fake = (posts: { id: string; integrationId: string }[], channels: { customerId: string; name: string }[], off: string[]) => ({
   model: {
     post: { findMany: async () => posts },
     integration: { findMany: async () => channels.map((c) => ({ customerId: c.customerId, customer: { name: c.name } })) },
@@ -20,6 +20,11 @@ test('a new post for a brand that needs approval is refused', async () => {
 test('approval off, no brand, or an already scheduled post pass', async () => {
   await new BrandApprovalService(fake([], [{ customerId: 'm', name: 'Moon' }], ['m']) as never).assertCanQueue('o', [{ integrationId: 'i1' }]);
   await new BrandApprovalService(fake([], [], []) as never).assertCanQueue('o', [{ integrationId: 'i1' }]);
-  await new BrandApprovalService(fake([{ id: 'p1' }], [{ customerId: 'm', name: 'Moon' }], []) as never)
+  await new BrandApprovalService(fake([{ id: 'p1', integrationId: 'i1' }], [{ customerId: 'm', name: 'Moon' }], []) as never)
     .assertCanQueue('o', [{ integrationId: 'i1', postId: 'p1' }]);
+});
+
+test('a live post re-saved onto another channel is checked as a new post there', async () => {
+  const s = new BrandApprovalService(fake([{ id: 'p1', integrationId: 'i9' }], [{ customerId: 'm', name: 'Moon' }], []) as never);
+  await assert.rejects(s.assertCanQueue('o', [{ integrationId: 'i1', postId: 'p1' }]), ForbiddenException);
 });

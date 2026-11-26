@@ -885,10 +885,13 @@ export class PostsService {
     creationMethod: CreationMethod
   ): Promise<any[]> {
     // >>> SANAD-BRANDS: a brand whose posts need approval is scheduled only through Approve in Brands (spec rule 2)
-    if (body.type === 'schedule' || body.type === 'now') {
-      await this._brandApproval.assertCanQueue(orgId, body.posts.map((p) => ({
-        integrationId: p.integration.id, postId: p.value?.[0]?.id || null,
-      })));
+    // Every type but 'draft' can leave a QUEUE post ('update' keeps the state, and a new row defaults to QUEUE). The root
+    // decides for new thread items; any other existing item id is checked on its own.
+    if (body.type !== 'draft') {
+      await this._brandApproval.assertCanQueue(orgId, body.posts.flatMap((p) => [
+        { integrationId: p.integration.id, postId: p.value?.[0]?.id || null },
+        ...(p.value || []).slice(1).filter((v) => v.id).map((v) => ({ integrationId: p.integration.id, postId: v.id as string })),
+      ]));
     }
     // <<< SANAD-BRANDS
     const postList = [];

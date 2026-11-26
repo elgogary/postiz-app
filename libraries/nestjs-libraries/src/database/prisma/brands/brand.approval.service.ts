@@ -14,10 +14,12 @@ export class BrandApprovalService {
     const live = ids.length
       ? await this._prisma.model.post.findMany({
         where: { id: { in: ids }, organizationId: orgId, deletedAt: null, state: { in: ['QUEUE', 'PUBLISHED'] } },
-        select: { id: true },
+        select: { id: true, integrationId: true },
       })
       : [];
-    const already = new Set(live.map((p) => p.id));
+    // A live post is exempt only on its own channel: re-saving it onto another brand's channel is a new QUEUE there.
+    const byId = new Map(live.map((p) => [p.id, p.integrationId]));
+    const already = new Set(items.filter((i) => i.postId && byId.get(i.postId) === i.integrationId).map((i) => i.postId as string));
     const integrationIds = [...new Set(items.filter((i) => !i.postId || !already.has(i.postId)).map((i) => i.integrationId))];
     if (!integrationIds.length) return null;
     const channels = await this._prisma.model.integration.findMany({
