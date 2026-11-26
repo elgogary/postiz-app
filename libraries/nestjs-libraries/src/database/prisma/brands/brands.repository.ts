@@ -50,10 +50,12 @@ export class BrandsRepository {
   }
 
   saveSections(orgId: string, customerId: string, userId: string,
-    writes: { key: string; content?: string; rows?: string[][]; note?: string | null }[]) {
-    return this._prisma.model.$transaction(
-      writes.map(({ key, ...data }) => this.sectionUpsert(orgId, customerId, userId, key, data))
-    );
+    writes: { key: string; content?: string; rows?: string[][]; note?: string | null }[],
+    extra: Prisma.PrismaPromise<unknown>[] = []) {
+    return this._prisma.model.$transaction([
+      ...writes.map(({ key, ...data }) => this.sectionUpsert(orgId, customerId, userId, key, data)),
+      ...extra,
+    ]);
   }
 
   accessForUser(orgId: string, userId: string) {

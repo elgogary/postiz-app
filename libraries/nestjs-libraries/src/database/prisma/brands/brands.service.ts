@@ -1,10 +1,12 @@
 // >>> SANAD-BRANDS
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
+import { BrandPostsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.posts.repository';
 import { ImportPlanDto, SaveSectionDto, SetAccessDto, SetSettingsDto } from '@gitroom/nestjs-libraries/dtos/brands/brands.dto';
 import {
   AccessRole, BrandRole, OrgRole, canEdit, cleanHtml, isOrgAdmin, isRowSection, isTextSection, resolveBrandRole, validateRows,
 } from '@gitroom/helpers/brands/brand.rules';
+import { BriefWrite, matchPosts } from '@gitroom/helpers/brands/post.rules';
 import { parsePlan } from '@gitroom/helpers/brands/plan.parser';
 import { prepareImport } from '@gitroom/helpers/brands/plan.import';
 
@@ -13,7 +15,7 @@ export const orgRoleOf = (org: unknown): OrgRole =>
 
 @Injectable()
 export class BrandsService {
-  constructor(private _repo: BrandsRepository) {}
+  constructor(private _repo: BrandsRepository, private _posts: BrandPostsRepository) {}
 
   private async roles(orgId: string, userId: string, orgRole: OrgRole) {
     const rows = await this._repo.accessForUser(orgId, userId);
@@ -120,18 +122,37 @@ export class BrandsService {
   async importPlan(orgId: string, userId: string, orgRole: OrgRole, customerId: string, dto: ImportPlanDto) {
     this.mustAdmin(orgRole);
     await this.mustCustomer(orgId, customerId);
+    const tz = dto.tzOffset ?? 0;
     let prepared: ReturnType<typeof prepareImport>;
     try {
-      prepared = prepareImport(parsePlan(dto.html));
+      prepared = prepareImport(parsePlan(dto.html), tz);
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
     const held = new Set((await this._repo.sections(orgId, customerId))
       .filter((s) => (s.content ?? '').trim() !== '' || (Array.isArray(s.rows) && s.rows.length > 0)).map((s) => s.key));
-    const summary = { ...prepared.summary, replaces: prepared.writes.map((w) => w.key).filter((k) => held.has(k)) };
+    const existing = await this._posts.briefs(orgId, customerId);
+    const linkedRefs = new Set(existing.filter((b) => b.postId && b.planRef).map((b) => b.planRef as string));
+    const taken = new Set(existing.map((b) => b.postId).filter((x): x is string => !!x));
+    const links = await this.matchExisting(orgId, customerId, prepared.briefs.filter((b) => !linkedRefs.has(b.planRef)), taken, tz);
+    const summary = {
+      ...prepared.summary, matched: Object.keys(links).length,
+      replaces: prepared.writes.map((w) => w.key).filter((k) => held.has(k)),
+    };
     if (dto.dryRun) return { dryRun: true, ...summary };
-    await this._repo.saveSections(orgId, customerId, userId, prepared.writes);
+    await this._repo.saveSections(orgId, customerId, userId, prepared.writes,
+      prepared.briefs.map((b) => this._posts.briefUpsert(orgId, customerId, b, links[b.planRef])));
     return { dryRun: false, ...summary };
+  }
+
+  private async matchExisting(orgId: string, customerId: string, briefs: BriefWrite[], taken: Set<string>, tz: number) {
+    if (!briefs.length) return {};
+    const channels = (await this._repo.channels(orgId)).filter((c) => c.customerId === customerId).map((c) => c.id);
+    if (!channels.length) return {};
+    const times = briefs.map((b) => Date.parse(b.plannedAt));
+    const posts = await this._posts.posts(orgId, channels, new Date(Math.min(...times) - 86400000),
+      new Date(Math.max(...times) + 2 * 86400000), []);
+    return matchPosts(briefs, posts.map((p) => ({ id: p.id, publishDate: p.publishDate.toISOString() })), taken, tz);
   }
 }
 // <<< SANAD-BRANDS
