@@ -47,8 +47,8 @@ test('a script with code is refused, not run', () => {
   assert.throws(() => parsePlan('<script>const P=[(function(){return 1})()];const GOALS={};const WEEKS=[];</script>'), /plan data/);
 });
 
-const REAL = process.env.PLAN_FIXTURE || '/home/eslam/docs/personal-brand/eslam-linkedin/content/2026-11-content-plan-pwc-bcg-final.html';
-test('the owner\'s November plan (skipped when absent)', { skip: !existsSync(REAL) }, () => {
+const REAL = process.env.PLAN_FIXTURE || '';
+test('a real plan file from PLAN_FIXTURE (skipped when unset)', { skip: !REAL || !existsSync(REAL) }, () => {
   const plan = parsePlan(readFileSync(REAL, 'utf8'));
   assert.equal(plan.posts.length, 13);
   assert.equal(plan.rows.focus.length, 5);
