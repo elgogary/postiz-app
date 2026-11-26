@@ -7,7 +7,7 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 @Injectable()
 export class BrandsRepository {
   constructor(
-    private _prisma: PrismaRepository<'brandSection' | 'brandAccess' | 'brandSettings' | 'customer' | 'integration' | 'userOrganization'>
+    private _prisma: PrismaRepository<'brandSection' | 'brandAccess' | 'brandSettings' | 'customer' | 'integration' | 'userOrganization' | '$transaction'>
   ) {}
 
   customers(orgId: string) {
@@ -29,8 +29,8 @@ export class BrandsRepository {
     return this._prisma.model.brandSection.findMany({ where: { orgId, customerId } });
   }
 
-  saveSection(orgId: string, customerId: string, key: string, userId: string,
-    data: { content?: string | null; rows?: string[][] | null; note?: string | null }) {
+  private sectionUpsert(orgId: string, customerId: string, userId: string,
+    key: string, data: { content?: string | null; rows?: string[][] | null; note?: string | null }) {
     const values = {
       ...(data.content !== undefined ? { content: data.content } : {}),
       ...(data.rows !== undefined ? { rows: data.rows === null ? Prisma.JsonNull : data.rows } : {}),
@@ -42,6 +42,18 @@ export class BrandsRepository {
       create: { orgId, customerId, key, ...values },
       update: values,
     });
+  }
+
+  saveSection(orgId: string, customerId: string, key: string, userId: string,
+    data: { content?: string | null; rows?: string[][] | null; note?: string | null }) {
+    return this.sectionUpsert(orgId, customerId, userId, key, data);
+  }
+
+  saveSections(orgId: string, customerId: string, userId: string,
+    writes: { key: string; content?: string; rows?: string[][]; note?: string | null }[]) {
+    return this._prisma.model.$transaction(
+      writes.map(({ key, ...data }) => this.sectionUpsert(orgId, customerId, userId, key, data))
+    );
   }
 
   accessForUser(orgId: string, userId: string) {

@@ -6,6 +6,7 @@ import {
   AccessRole, BrandRole, OrgRole, canEdit, cleanHtml, isOrgAdmin, isRowSection, isTextSection, resolveBrandRole, validateRows,
 } from '@gitroom/helpers/brands/brand.rules';
 import { parsePlan } from '@gitroom/helpers/brands/plan.parser';
+import { prepareImport } from '@gitroom/helpers/brands/plan.import';
 
 export const orgRoleOf = (org: unknown): OrgRole =>
   ((org as { users?: { role?: OrgRole }[] })?.users?.[0]?.role || 'USER') as OrgRole;
@@ -50,7 +51,7 @@ export class BrandsService {
     const [brands, sections, team] = await Promise.all([
       this.list(orgId, userId, orgRole), this._repo.sections(orgId, customerId), this._repo.team(orgId),
     ]);
-    const names = new Map(team.map((t) => [t.user.id, t.user.name || t.user.email]));
+    const names = new Map(team.map((t) => [t.user.id, t.user.name || null]));
     return {
       ...brands.find((b) => b.id === customerId)!,
       sections: Object.fromEntries(sections.map((s) => [s.key, {
@@ -66,15 +67,18 @@ export class BrandsService {
     if (!canEdit(roleOf(customerId))) throw new ForbiddenException('You can view this brand but not change it');
     try {
       if (isTextSection(key)) {
-        return await this._repo.saveSection(orgId, customerId, key, userId, { content: cleanHtml(dto.content || '') });
+        if (dto.content === undefined || dto.content === null) throw new BadRequestException('Text is missing');
+        return await this._repo.saveSection(orgId, customerId, key, userId, { content: cleanHtml(dto.content) });
       }
       if (isRowSection(key)) {
+        if (!dto.rows) throw new BadRequestException('Rows are missing');
         return await this._repo.saveSection(orgId, customerId, key, userId, {
-          rows: validateRows(key, dto.rows || []),
+          rows: validateRows(key, dto.rows),
           ...(dto.note !== undefined ? { note: dto.note.trim() || null } : {}),
         });
       }
     } catch (e) {
+      if (e instanceof BadRequestException) throw e;
       throw new BadRequestException((e as Error).message);
     }
     throw new BadRequestException(`Unknown section ${key}`);
@@ -114,25 +118,15 @@ export class BrandsService {
   async importPlan(orgId: string, userId: string, orgRole: OrgRole, customerId: string, dto: ImportPlanDto) {
     this.mustAdmin(orgRole);
     await this.mustCustomer(orgId, customerId);
-    let plan;
+    let prepared: ReturnType<typeof prepareImport>;
     try {
-      plan = parsePlan(dto.html);
+      prepared = prepareImport(parsePlan(dto.html));
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
-    const summary = {
-      sections: Object.keys(plan.sections).filter((k) => plan.sections[k as keyof typeof plan.sections].trim()),
-      rows: Object.fromEntries(Object.entries(plan.rows).map(([k, v]) => [k, v.length])),
-      posts: plan.posts.length,
-    };
-    if (dto.dryRun) return { dryRun: true, ...summary };
-    for (const [key, html] of Object.entries(plan.sections)) {
-      if (html.trim()) await this._repo.saveSection(orgId, customerId, key, userId, { content: cleanHtml(html) });
-    }
-    for (const [key, rows] of Object.entries(plan.rows)) {
-      await this._repo.saveSection(orgId, customerId, key, userId, { rows: validateRows(key, rows), note: plan.notes[key] || null });
-    }
-    return { dryRun: false, ...summary };
+    if (dto.dryRun) return { dryRun: true, ...prepared.summary };
+    await this._repo.saveSections(orgId, customerId, userId, prepared.writes);
+    return { dryRun: false, ...prepared.summary };
   }
 }
 // <<< SANAD-BRANDS
