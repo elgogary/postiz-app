@@ -43,6 +43,14 @@ test('mini plan: sections, typed rows, notes and posts', () => {
   assert.equal(plan.goals.ed, 'Education');
 });
 
+test('a section ends before the next section tag, not inside it', () => {
+  const plan = parsePlan(MINI.replace(/<section id="/g, '<section class="section" id="'));
+  for (const [key, html] of Object.entries(plan.sections)) {
+    assert.doesNotMatch(html, /section|class=/, `${key} keeps a piece of the next section tag`);
+  }
+  assert.match(plan.sections.summary, /<strong>message<\/strong>/);
+});
+
 test('a script with code is refused, not run', () => {
   assert.throws(() => parsePlan('<script>const P=[(function(){return 1})()];const GOALS={};const WEEKS=[];</script>'), /plan data/);
 });

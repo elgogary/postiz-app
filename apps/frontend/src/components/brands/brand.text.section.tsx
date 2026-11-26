@@ -1,15 +1,20 @@
 'use client';
 // >>> SANAD-BRANDS: one brand-book text section. Read view sets each block's direction from its own text, so Arabic
-// lines read right to left even when they start with an English term.
-import { FC, useEffect, useRef, useState } from 'react';
+// lines read right to left even when they start with an English term. The directions are written into the HTML
+// string (memoized): React 19 re-applies innerHTML on every render of a new object, which wiped DOM-set attributes.
+import { FC, useEffect, useMemo, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { AR, errorText, SectionData } from './brands.api';
 
-export const setDirections = (root: HTMLElement | null) => {
-  root?.querySelectorAll('p, li, ul, ol, h3, h4, table').forEach((el) => el.setAttribute('dir', AR.test(el.textContent || '') ? 'rtl' : 'ltr'));
+const withDirections = (html: string) => {
+  if (typeof window === 'undefined' || !html) return html;
+  const root = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').body.firstElementChild;
+  if (!root) return html;
+  root.querySelectorAll('p, li, ul, ol, h3, h4, table').forEach((el) => el.setAttribute('dir', AR.test(el.textContent || '') ? 'rtl' : 'ltr'));
+  return root.innerHTML;
 };
 
 export const BrandTextSection: FC<{
@@ -19,10 +24,9 @@ export const BrandTextSection: FC<{
   const { show } = useToaster();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const view = useRef<HTMLDivElement>(null);
   const editor = useEditor({ extensions: [StarterKit], content: data?.content || '', immediatelyRender: false });
+  const inner = useMemo(() => ({ __html: withDirections(data?.content || '') }), [data?.content]);
 
-  useEffect(() => { setDirections(view.current); }, [data?.content, editing]);
   useEffect(() => { if (editing) editor?.commands.setContent(data?.content || ''); }, [editing]);
 
   const save = async () => {
@@ -67,8 +71,8 @@ export const BrandTextSection: FC<{
           </div>
         </>
       ) : data?.content ? (
-        <div ref={view} className="text-[14px] leading-[1.75] [&_ul]:ps-[24px] [&_ul]:list-disc [&_ol]:ps-[24px] [&_ol]:list-decimal [&_strong]:font-[600] [&_p+p]:mt-[8px]"
-          dangerouslySetInnerHTML={{ __html: data.content }} />
+        <div className="text-[14px] leading-[1.75] [&_ul]:ps-[24px] [&_ul]:list-disc [&_ol]:ps-[24px] [&_ol]:list-decimal [&_strong]:font-[600] [&_p+p]:mt-[8px]"
+          dangerouslySetInnerHTML={inner} />
       ) : (
         <p className="text-[14px] text-customColor18">{t('not_written_yet', 'Not written yet.')}</p>
       )}

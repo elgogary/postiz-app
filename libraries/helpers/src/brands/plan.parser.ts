@@ -107,7 +107,8 @@ function sectionHtml(page: string, id: string, ids: string[]): string {
   const m = new RegExp(`id="${id}"`).exec(page);
   if (!m) return '';
   const after = m.index + m[0].length;
-  const ends = ids.filter((x) => x !== id).map((x) => page.indexOf(`id="${x}"`, after)).filter((x) => x > after);
+  const ends = ids.filter((x) => x !== id).map((x) => page.indexOf(`id="${x}"`, after)).filter((x) => x > after)
+    .map((x) => page.lastIndexOf('<', x)).filter((x) => x > after);
   const scriptAt = page.indexOf('<script', after);
   const end = Math.min(...ends, scriptAt > after ? scriptAt : page.length);
   return simplify(page.slice(after, end).split('>').slice(1).join('>'));
