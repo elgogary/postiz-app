@@ -43,6 +43,11 @@ export function resolveBrandRole(orgRole: OrgRole, access?: AccessRole | null): 
 export const canEdit = (r: BrandRole) => r === 'create' || r === 'approve';
 export const canApprove = (r: BrandRole) => r === 'approve';
 
+const isRealDate = (v: string) => {
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+};
+
 function checkCell(col: ColumnSpec, cell: unknown, rowNo: number): string {
   const v = cell === null || cell === undefined ? '' : String(cell).trim();
   if (v === '') return '';
@@ -50,7 +55,7 @@ function checkCell(col: ColumnSpec, cell: unknown, rowNo: number): string {
   const bad = () => new Error(`Row ${rowNo}, ${col.label}: "${v}" is not a valid ${col.type}`);
   if (col.type === 'url' && !/^https?:\/\/\S+$/.test(v)) throw bad();
   if (col.type === 'number' && !/^\d+(\.\d+)?$/.test(v)) throw bad();
-  if (col.type === 'date' && (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v)))) throw bad();
+  if (col.type === 'date' && (!/^\d{4}-\d{2}-\d{2}$/.test(v) || !isRealDate(v))) throw bad();
   if (col.type === 'month' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) throw bad();
   if (col.type === 'select' && !(col.options || []).some(([k]) => k === v)) throw bad();
   return v;
@@ -72,19 +77,27 @@ const ALLOWED = new Set(['p', 'ul', 'ol', 'li', 'strong', 'b', 'em', 'i', 'u', '
 
 export function cleanHtml(html: string): string {
   if (html.length > 100000) throw new Error('Text too long');
-  return html
-    .replace(/<(script|style|iframe|object|embed)\b[\s\S]*?<\/\1>/gi, '')
-    .replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (whole, tag: string, attrs: string) => {
-      const t = tag.toLowerCase();
-      if (!ALLOWED.has(t)) return '';
-      if (whole.startsWith('</')) return `</${t}>`;
-      if (t === 'br') return '<br>';
-      if (t === 'a') {
-        const href = /href\s*=\s*"(https?:\/\/[^"]*)"/i.exec(attrs);
-        return href ? `<a href="${href[1]}" target="_blank" rel="noopener noreferrer">` : '<a>';
-      }
-      return `<${t}>`;
-    });
+  let src = html;
+  for (let prev = ''; prev !== src; ) {
+    prev = src;
+    src = src.replace(/<(script|style|iframe|object|embed)\b[\s\S]*?<\/\1\s*>/gi, '');
+  }
+  const esc = (t: string) => t.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const tag = /<\/?([a-z0-9]+)\b[^<>]*>/gi;
+  let out = '';
+  let last = 0;
+  for (let m = tag.exec(src); m; m = tag.exec(src)) {
+    out += esc(src.slice(last, m.index));
+    last = m.index + m[0].length;
+    const t = m[1].toLowerCase();
+    if (!ALLOWED.has(t)) continue;
+    if (m[0].startsWith('</')) out += `</${t}>`;
+    else if (t === 'a') {
+      const href = /href\s*=\s*"(https?:\/\/[^"]*)"/i.exec(m[0]);
+      out += href ? `<a href="${href[1]}" target="_blank" rel="noopener noreferrer">` : '<a>';
+    } else out += `<${t}>`;
+  }
+  return out + esc(src.slice(last));
 }
 
 export function weekOf(focusRows: string[][], iso: string): number {

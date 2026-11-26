@@ -45,6 +45,20 @@ test('html: only simple formatting survives', () => {
   assert.equal(cleanHtml('<a href="https://x.com/a">x</a>'), '<a href="https://x.com/a" target="_blank" rel="noopener noreferrer">x</a>');
 });
 
+test('cleanHtml cannot rebuild a tag from leftovers and escapes stray angle brackets', () => {
+  for (const input of ['<<x>img src=x onerror=alert(1)>', '<<x>script>alert(1)<</x>/script>', '<p>a</p><img src=x onerror=alert(1)']) {
+    const out = cleanHtml(input);
+    assert.doesNotMatch(out, /<img|<script/i);
+    assert.doesNotMatch(out, /<(?!\/?(p|a)>)/);
+  }
+  assert.match(cleanHtml('<p>a</p><img src=x onerror=alert(1)'), /&lt;img/);
+  assert.equal(cleanHtml('1 < 2 > 0'), '1 &lt; 2 &gt; 0');
+});
+
+test('a date cell must be a real calendar date', () => {
+  assert.throws(() => validateRows('focus', [['2026-02-31', '2026-03-01', 't', 'd']]), /Start/);
+});
+
 test('week of a date comes from the Focus rows', () => {
   const focus = [['2026-11-15', '2026-11-21', 'a', ''], ['2026-11-22', '2026-11-28', 'b', '']];
   assert.equal(weekOf(focus, '2026-11-15'), 1);
