@@ -5,6 +5,7 @@ import { FC, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { FORMATS } from '@gitroom/helpers/brands/post.rules';
+import { canEdit } from '@gitroom/helpers/brands/brand.rules';
 import { IdeaView, composeIdeaText, parseIdeaText, pillarsFor } from '@gitroom/helpers/brands/idea.rules';
 import { IdeasData, dirOf, errorText, useBrandsApi } from './brands.api';
 
@@ -63,8 +64,8 @@ export const IdeaForm: FC<{ data: IdeasData; idea: IdeaView | null; brandId: str
         <textarea rows={3} dir={dirOf(bullets)} className={FIELD} value={bullets} onChange={(e) => setBullets(e.target.value)} />
       </label>
       <fieldset className="flex flex-wrap gap-[12px]"><legend className="mb-[4px]">{t('brand', 'Brand')}</legend>
-        {data.brands.map((b) => (
-          <label key={b.id} className="flex items-center gap-[6px]"><input type="checkbox" className="w-[18px] h-[18px]" checked={brands.includes(b.id)} onChange={() => setBrands(toggle(brands, b.id))} />{b.name}</label>
+        {data.brands.filter((b) => canEdit(b.role) || (idea?.brandIds || []).includes(b.id)).map((b) => (
+          <label key={b.id} className="flex items-center gap-[6px] min-h-[24px] [@media(max-width:480px)]:min-h-[44px]"><input type="checkbox" className="w-[18px] h-[18px]" disabled={!canEdit(b.role)} checked={brands.includes(b.id)} onChange={() => setBrands(toggle(brands, b.id))} />{b.name}</label>
         ))}
       </fieldset>
       <div className="grid grid-cols-2 [@media(max-width:480px)]:grid-cols-1 gap-[12px]">
@@ -83,7 +84,7 @@ export const IdeaForm: FC<{ data: IdeasData; idea: IdeaView | null; brandId: str
       {options.length > 0 && (
         <fieldset className="flex flex-wrap gap-[12px]"><legend className="mb-[4px]">{t('pillar', 'Pillar')}</legend>
           {options.map((p) => (
-            <label key={p} className="flex items-center gap-[6px]"><input type="checkbox" className="w-[18px] h-[18px]" checked={pillars.includes(p)} onChange={() => setPillars(toggle(pillars, p))} />{p}</label>
+            <label key={p} className="flex items-center gap-[6px] min-h-[24px] [@media(max-width:480px)]:min-h-[44px]"><input type="checkbox" className="w-[18px] h-[18px]" checked={pillars.includes(p)} onChange={() => setPillars(toggle(pillars, p))} />{p}</label>
           ))}
         </fieldset>
       )}

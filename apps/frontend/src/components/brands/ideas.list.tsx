@@ -2,7 +2,7 @@
 // >>> SANAD-BRANDS: the ideas list shared by a brand's Ideas tab (scope = the brand) and the Idea Bank page (scope =
 // all, with a brand filter including No brand). Status filter New / In plan / Posted / Dropped / All (default New);
 // counts follow the topic, brand and search filters.
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
@@ -14,7 +14,7 @@ import { IdeaPlan } from './idea.plan';
 
 const STATUSES: (IdeaStatus | 'ALL')[] = ['NEW', 'PLANNED', 'POSTED', 'DROPPED', 'ALL'];
 const LABEL: Record<string, string> = { NEW: 'New', PLANNED: 'In plan', POSTED: 'Posted', DROPPED: 'Dropped', ALL: 'All' };
-const COLORS = ['#3b5bdb', '#0b7285', '#2b8a3e', '#c2255c', '#e67700', '#5f3dc4'];
+const COLORS = ['#3b5bdb', '#0b7285', '#2b8a3e', '#c2255c', '#b35c00', '#5f3dc4'];
 const initials = (name: string) => name.split(/\s+/).filter((w) => /\p{L}/u.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 const QUIET = 'text-[13px] px-[12px] h-[32px] [@media(max-width:480px)]:h-[44px] rounded-[6px] border border-fifth';
 
@@ -30,15 +30,28 @@ export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
   const [brandFilter, setBrandFilter] = useState('');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState('');
+  const [failed, setFailed] = useState('');
+  const [busyId, setBusyId] = useState('');
+  const seq = useRef(0);
   const brandId = scope === 'all' ? null : scope;
 
-  const load = useCallback(() => api.ideas(scope).then(setData).catch((e) => show(errorText(e, t), 'warning')), [api, scope]);
+  const load = useCallback(() => {
+    const mine = ++seq.current;
+    return api.ideas(scope).then((d) => { if (mine === seq.current) { setData(d); setFailed(''); } })
+      .catch((e) => { if (mine === seq.current) { const m = errorText(e, t); setFailed(m); show(m, 'warning'); } });
+  }, [api, scope]);
   useEffect(() => { load(); }, [load]);
 
   const pool = useMemo(() => (data?.ideas || []).filter((i) =>
     (!topic || i.topic === topic)
     && (!brandFilter || (brandFilter === 'none' ? i.brandIds.length === 0 : i.brandIds.includes(brandFilter)))
     && (!q.trim() || `${i.hook} ${i.angle}`.toLowerCase().includes(q.trim().toLowerCase()))), [data, topic, brandFilter, q]);
+  if (!data && failed) return (
+    <div className="flex flex-wrap items-center gap-[8px] text-[13px]">
+      <span className="text-customColor18">{failed}</span>
+      <button className={QUIET} onClick={() => { setFailed(''); load(); }}>{t('retry', 'Retry')}</button>
+    </div>
+  );
   if (!data) return <div className="text-customColor18">{t('loading', 'Loading…')}</div>;
 
   const roleOf = (id: string) => data.brands.find((b) => b.id === id)?.role;
@@ -55,8 +68,10 @@ export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
     children: (close: () => void) => <IdeaPlan data={data} idea={idea} brandId={brandId} close={close} onDone={load} />,
   });
   const setIdeaStatus = async (idea: IdeaView, next: 'DROPPED' | 'NEW') => {
+    setBusyId(idea.id);
     try { await api.ideaStatus(idea.id, next); show(next === 'DROPPED' ? t('idea_dropped', 'Idea dropped') : t('idea_restored', 'Idea restored'), 'success'); await load(); }
     catch (e) { show(errorText(e, t), 'warning'); }
+    setBusyId('');
   };
 
   return (
@@ -104,7 +119,7 @@ export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
                       : i.brandIds.map((id) => {
                         const b = data.brands.find((x) => x.id === id);
                         const n = data.brands.findIndex((x) => x.id === id);
-                        return b ? <span key={id} title={b.name} aria-label={b.name} className="w-[24px] h-[24px] rounded-full text-white text-[10px] font-[700] flex items-center justify-center" style={{ background: COLORS[n % COLORS.length] }}>{initials(b.name)}</span> : null;
+                        return b ? <span key={id} role="img" title={b.name} aria-label={b.name} className="w-[24px] h-[24px] rounded-full text-white text-[10px] font-[700] flex items-center justify-center" style={{ background: COLORS[n % COLORS.length] }}>{initials(b.name)}</span> : null;
                       })}
                     <span className="px-[6px] rounded-[6px] border border-fifth">{t(`topic_${i.topic.toLowerCase().replace(/[^a-z]+/g, '_')}`, i.topic)}</span>
                     {i.pillars.map((p) => <span key={p} className="px-[6px] rounded-[6px] border border-[#612BD3]/30 text-[#5221b8] dark:text-[#c4b5fd]">{p}</span>)}
@@ -119,20 +134,22 @@ export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
                         {/^https?:\/\//.test(i.source) ? <a className="underline" href={i.source} target="_blank" rel="noopener noreferrer">{t('source', 'Source')}</a> : i.source ? `${t('source', 'Source')}: ${i.source}` : null}
                         {' '}{t('added_on', 'Added {date}').replace('{date}', new Date(i.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }))}
                       </div>
-                      {write && i.status === 'NEW' && <button className={`${QUIET} self-start`} onClick={() => setIdeaStatus(i, 'DROPPED')}>{t('drop', 'Drop')}</button>}
-                      {write && i.status === 'DROPPED' && <button className={`${QUIET} self-start`} onClick={() => setIdeaStatus(i, 'NEW')}>{t('restore', 'Restore')}</button>}
+                      {write && i.status === 'NEW' && <button className={`${QUIET} self-start disabled:opacity-50`} disabled={busyId === i.id} aria-label={t('drop_idea_named', 'Drop idea: {hook}').replace('{hook}', i.hook)} onClick={() => setIdeaStatus(i, 'DROPPED')}>{t('drop', 'Drop')}</button>}
+                      {write && i.status === 'DROPPED' && <button className={`${QUIET} self-start disabled:opacity-50`} disabled={busyId === i.id} aria-label={t('restore_idea_named', 'Restore idea: {hook}').replace('{hook}', i.hook)} onClick={() => setIdeaStatus(i, 'NEW')}>{t('restore', 'Restore')}</button>}
                     </div>
                   )}
                 </div>
                 <div className="flex items-start gap-[8px] shrink-0">
                   {planned ? (
-                    <button className={QUIET} onClick={() => router.push(`/brands?brand=${planned.brandId}&tab=posts&focus=${encodeURIComponent(`b:${i.briefId}`)}`)}>
-                      {t('planned_on_brand', 'Planned · {day} · {brand}').replace('{day}', new Date(planned.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })).replace('{brand}', plannedBrand)}
+                    <button className={`${QUIET.replace(' h-[32px] [@media(max-width:480px)]:h-[44px]', '')} min-h-[32px] [@media(max-width:480px)]:min-h-[44px] py-[4px] text-start`} onClick={() => router.push(`/brands?brand=${planned.brandId}&tab=posts&focus=${encodeURIComponent(`b:${i.briefId}`)}`)}>
+                      {plannedBrand
+                        ? t('planned_on_brand', 'Planned · {day} · {brand}').replace('{day}', new Date(planned.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })).replace('{brand}', plannedBrand)
+                        : t('planned_plain', 'Planned')}
                     </button>
                   ) : write ? (
                     <>
-                      <button className={QUIET} aria-label={t('edit_idea', 'Edit idea')} onClick={() => form(i)}>{t('edit', 'Edit')}</button>
-                      {i.status === 'NEW' && <button className="text-[13px] px-[12px] h-[32px] [@media(max-width:480px)]:h-[44px] rounded-[6px] bg-[#612BD3] text-white" onClick={() => plan(i)}>{t('plan_it', 'Plan it')}</button>}
+                      <button className={QUIET} aria-label={t('edit_idea_named', 'Edit idea: {hook}').replace('{hook}', i.hook)} onClick={() => form(i)}>{t('edit', 'Edit')}</button>
+                      {i.status === 'NEW' && <button className="text-[13px] px-[12px] h-[32px] [@media(max-width:480px)]:h-[44px] rounded-[6px] bg-[#612BD3] text-white" aria-label={t('plan_idea_named', 'Plan idea: {hook}').replace('{hook}', i.hook)} onClick={() => plan(i)}>{t('plan_it', 'Plan it')}</button>}
                     </>
                   ) : null}
                 </div>

@@ -86,7 +86,7 @@ export const useBrandsApi = () => {
     saveIdea: (id: string, body: IdeaInput) => send(`/brand-ideas/${id}`, 'PUT', body) as Promise<IdeaView>,
     ideaStatus: (id: string, status: 'DROPPED' | 'NEW') => send(`/brand-ideas/${id}/status`, 'PUT', { status }),
     planIdea: (id: string, body: { customerId: string; date: string; format: string; ai: boolean }) =>
-      send(`/brand-ideas/${id}/plan`, 'POST', body) as Promise<{ briefId: string; firstDraft: boolean; aiFailed: boolean }>,
+      send(`/brand-ideas/${id}/plan`, 'POST', body) as Promise<{ briefId: string; firstDraft: boolean; aiFailed: boolean; noChannel: boolean }>,
     refineIdea: (idea: string) => send('/engagement/content-ideas/refine', 'POST', { idea }) as Promise<{ refined: string }>,
   }), [send]);
 };

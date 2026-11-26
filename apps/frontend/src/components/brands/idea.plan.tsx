@@ -39,14 +39,18 @@ export const IdeaPlan: FC<{ data: IdeasData; idea: IdeaView; brandId: string | n
     try {
       const res = await api.planIdea(idea.id, { customerId: brand, date: localToUtc(day, '09:30', new Date().getTimezoneOffset()), format, ai });
       const when = new Date(`${day}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
-      show(res.firstDraft
+      if (res.noChannel) show(t('idea_planned_no_channel', 'Planned. This brand has no channel yet, so no draft was made.'), 'warning');
+      else show(res.firstDraft
         ? t('first_draft_written', 'First draft written for {day}: check it in Posts').replace('{day}', when)
         : res.aiFailed
           ? t('ai_draft_failed', 'The first draft could not be written: planned for {day} in {brand} without a draft').replace('{day}', when).replace('{brand}', name)
           : t('planned_for', 'Planned for {day} in {brand}').replace('{day}', when).replace('{brand}', name), res.aiFailed ? 'warning' : 'success');
       onDone();
       close();
-    } catch (e) { show(errorText(e, t), 'warning'); }
+    } catch (e) {
+      show(errorText(e, t), 'warning');
+      if ((e as { status?: number }).status === 400) onDone();
+    }
     setBusy(false);
   };
 
@@ -64,7 +68,7 @@ export const IdeaPlan: FC<{ data: IdeasData; idea: IdeaView; brandId: string | n
       <label className="flex flex-col gap-[4px]">{t('format', 'Format')}
         <select className={FIELD} value={format} onChange={(e) => setFormat(e.target.value)}>{FORMATS.map((f) => <option key={f} value={f}>{t(`format_${f.toLowerCase()}`, f)}</option>)}</select>
       </label>
-      <label className="flex gap-[8px] items-start">
+      <label className="flex gap-[8px] items-start min-h-[24px] [@media(max-width:480px)]:min-h-[44px]">
         <input type="checkbox" className="mt-[2px] w-[18px] h-[18px]" checked={ai} onChange={(e) => setAi(e.target.checked)} />
         <span>{t('write_first_draft_ai', 'Write the first draft with AI')}<span className="block text-[12px] text-customColor18">{t('first_draft_help', "Caption in the brand's voice rules, plus slide text or a video script. Saved as a draft to check.")}</span></span>
       </label>
