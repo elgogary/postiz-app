@@ -111,7 +111,7 @@ export const IdeasList: FC<{ scope: string }> = ({ scope }) => {
             return (
               <li key={i.id} dir={dirOf(i.hook)} className="p-[12px] flex [@media(max-width:480px)]:flex-col gap-[12px]">
                 <div className="flex-1 min-w-0 flex flex-col gap-[4px]">
-                  <button className="text-start text-[15px] font-[600]" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? '' : i.id)}>{i.hook}</button>
+                  <button className="text-start text-[15px] font-[600] min-h-[24px] [@media(max-width:480px)]:min-h-[44px]" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? '' : i.id)}>{i.hook}</button>
                   {i.angle && <p className={`text-[13px] text-customColor18 ${isOpen ? '' : 'line-clamp-1'}`}>{i.angle}</p>}
                   <div className="flex flex-wrap items-center gap-[6px] text-[12px]">
                     {i.brandIds.length === 0
