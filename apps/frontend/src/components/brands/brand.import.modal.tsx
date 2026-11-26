@@ -8,7 +8,7 @@ import { errorText, ImportSummary, useBrandsApi } from './brands.api';
 
 const SECTION_LABELS: Record<string, string> = {
   summary: 'Summary', voice: 'Voice', routine: 'Engagement', profile: 'Profile tips', pillars: 'Pillars',
-  bench: 'Benchmark', kpi: 'KPIs', review: 'Before publishing', history: 'Past posts', focus: 'Focus',
+  bench: 'Benchmark', kpi: 'KPIs', review: 'Before publishing', history: 'Past posts', focus: 'Focus', mix: 'Content mix',
 };
 
 export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: () => void }> = ({ brandId, close, onDone }) => {
@@ -47,7 +47,7 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
           <span>{t('text_sections', 'Text sections')}: {summary.sections.map(sectionName).join(', ')}</span>
           {Object.entries(summary.rows).map(([k, v]) => <span key={k}>{sectionName(k)}: {v} {t('rows', 'rows')}</span>)}
           {summary.replaces.length > 0 && <span>{t('replaces_now', 'Replaces what is there now')}: {summary.replaces.map(sectionName).join(', ')}</span>}
-          <span className="text-customColor18">{summary.posts} {t('posts_next_step', 'posts in the plan (added with the review loop)')}</span>
+          <span>{summary.posts} {t('plan_posts', 'posts in the plan')}{summary.matched ? `, ${summary.matched} ${t('matched_existing', 'matched to posts already in Postiz')}` : ''}</span>
         </div>
       )}
       <div className="flex justify-end gap-[8px]">
