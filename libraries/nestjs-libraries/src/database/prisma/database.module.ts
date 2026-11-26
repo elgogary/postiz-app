@@ -34,6 +34,7 @@ import { EngagementScraperManager } from '@gitroom/nestjs-libraries/integrations
 import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandPostsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.posts.repository';
+import { BrandApprovalService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.approval.service';
 // <<< SANAD-BRANDS
 import { SignatureRepository } from '@gitroom/nestjs-libraries/database/prisma/signatures/signature.repository';
 import { SignatureService } from '@gitroom/nestjs-libraries/database/prisma/signatures/signature.service';
@@ -82,6 +83,7 @@ import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/adm
     BrandsRepository,
     BrandsService,
     BrandPostsRepository,
+    BrandApprovalService,
     // <<< SANAD-BRANDS
     IntegrationService,
     IntegrationRepository,

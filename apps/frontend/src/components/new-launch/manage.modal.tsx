@@ -407,12 +407,25 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       }
 
       if (!dummy) {
-        addEditSets
-          ? addEditSets(data)
-          : await fetch('/posts', {
-              method: 'POST',
-              body: JSON.stringify(data),
-            });
+        // >>> SANAD-BRANDS: a refused save (e.g. a brand whose posts need approval) shows the server's reason and keeps
+        // the editor open, instead of "Added successfully".
+        let saved: Response | null = null;
+        if (addEditSets) {
+          addEditSets(data);
+        } else {
+          saved = await fetch('/posts', {
+            method: 'POST',
+            body: JSON.stringify(data),
+          });
+        }
+        if (saved && !saved.ok) {
+          const body = await saved.json().catch(() => ({} as { message?: string | string[] }));
+          const msg = Array.isArray(body?.message) ? body.message.join(', ') : body?.message;
+          setLoading(false);
+          toaster.show(msg || t('post_not_saved', 'The post was not saved'), 'warning');
+          return;
+        }
+        // <<< SANAD-BRANDS
 
         if (!addEditSets) {
           mutate();

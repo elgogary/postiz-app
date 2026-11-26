@@ -47,6 +47,9 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
+// >>> SANAD-BRANDS
+import { BrandApprovalService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.approval.service';
+// <<< SANAD-BRANDS
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripLinks } from '@gitroom/helpers/utils/strip.links';
 import { validate } from 'class-validator';
@@ -70,7 +73,10 @@ export class PostsService {
     private _shortLinkService: ShortLinkService,
     private _openaiService: OpenaiService,
     private _temporalService: TemporalService,
-    private _refreshIntegrationService: RefreshIntegrationService
+    private _refreshIntegrationService: RefreshIntegrationService,
+    // >>> SANAD-BRANDS
+    private _brandApproval: BrandApprovalService
+    // <<< SANAD-BRANDS
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -878,6 +884,13 @@ export class PostsService {
     body: CreatePostDto,
     creationMethod: CreationMethod
   ): Promise<any[]> {
+    // >>> SANAD-BRANDS: a brand whose posts need approval is scheduled only through Approve in Brands (spec rule 2)
+    if (body.type === 'schedule' || body.type === 'now') {
+      await this._brandApproval.assertCanQueue(orgId, body.posts.map((p) => ({
+        integrationId: p.integration.id, postId: p.value?.[0]?.id || null,
+      })));
+    }
+    // <<< SANAD-BRANDS
     const postList = [];
     for (const post of body.posts) {
       const provider = this._integrationManager.getSocialIntegration(
@@ -944,12 +957,20 @@ export class PostsService {
   async changePostStatus(
     orgId: string,
     id: string,
-    status: 'draft' | 'schedule'
+    status: 'draft' | 'schedule',
+    // >>> SANAD-BRANDS
+    approvedByReview = false
+    // <<< SANAD-BRANDS
   ) {
     const getPostById = await this._postRepository.getPostById(id, orgId);
     if (!getPostById) {
       throw new BadRequestException('Post not found');
     }
+    // >>> SANAD-BRANDS
+    if (status === 'schedule' && !approvedByReview) {
+      await this._brandApproval.assertCanQueue(orgId, [{ integrationId: getPostById.integrationId, postId: getPostById.id }]);
+    }
+    // <<< SANAD-BRANDS
 
     const state: State = status === 'draft' ? 'DRAFT' : 'QUEUE';
     await this._postRepository.changeState(id, state);
