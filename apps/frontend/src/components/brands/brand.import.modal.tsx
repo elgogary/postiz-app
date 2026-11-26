@@ -51,8 +51,8 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
         </div>
       )}
       <div className="flex justify-end gap-[8px]">
-        <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px]" onClick={close}>{t('cancel', 'Cancel')}</button>
-        <button disabled={!summary || busy} className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={run}>{t('import', 'Import')}</button>
+        <button className="text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px]" onClick={close}>{t('cancel', 'Cancel')}</button>
+        <button disabled={!summary || busy} className="text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={run}>{t('import', 'Import')}</button>
       </div>
     </div>
   );
