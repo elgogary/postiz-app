@@ -28,16 +28,31 @@ export const DRAFT_VERIFY = 'Check every number, name and example in this first 
 
 const BULLET = /^\s*(?:[-•*]|▪️?|\d+[.)])\s*/u;
 
+const LABEL = /^[ \t]*(hook|angle|bullets)[ \t]*:[ \t]*(.*)$/i;
+
+// Read line by line (a single regex over the whole text backtracks for minutes on long blank runs). The text is split
+// when it opens with Hook:, then Angle:, then optionally Bullets:; a label seen a second time is plain text.
 export const parseIdeaText = (text: string) => {
-  const t = (text || '').trim();
-  const m = /^Hook:\s*([\s\S]*?)\n\s*Angle:\s*([\s\S]*?)(?:\n\s*Bullets:[ \t]*(?:\n([\s\S]*))?)?$/i.exec(t);
-  if (m) {
-    const bullets = (m[3] || '').split('\n').map((l) => l.replace(BULLET, '').trim()).filter(Boolean);
-    return { hook: m[1].trim(), angle: m[2].trim(), bullets, split: true };
+  const t = (text || '').replace(/\r\n?/g, '\n').trim();
+  const parts: Record<string, string[]> = {};
+  const seen: string[] = [];
+  let at = '';
+  for (const line of t.split('\n')) {
+    const m = LABEL.exec(line);
+    const key = m ? m[1].toLowerCase() : '';
+    if (m && !parts[key]) { at = key; seen.push(key); parts[key] = [m[2]]; continue; }
+    if (!at) break;
+    parts[at].push(line);
   }
-  const cut = t.search(/[.؟?!:](\s|$)/);
-  const hook = (cut >= 0 ? t.slice(0, cut + 1) : t).slice(0, 160).trim();
-  return { hook, angle: t.slice(hook.length).trim(), bullets: [] as string[], split: false };
+  if (seen[0] === 'hook' && seen[1] === 'angle' && (seen.length === 2 || seen[2] === 'bullets')) {
+    const join = (k: string) => (parts[k] || []).join('\n').trim();
+    const bullets = (parts.bullets || []).map((l) => l.replace(BULLET, '').trim()).filter(Boolean);
+    return { hook: join('hook'), angle: join('angle'), bullets, split: true };
+  }
+  const body = t.replace(/^[ \t]*hook[ \t]*:[ \t]*/i, '');
+  const cut = body.search(/[.؟?!:](\s|$)/);
+  const hook = (cut >= 0 ? body.slice(0, cut + 1) : body).slice(0, 160).trim();
+  return { hook, angle: body.slice(hook.length).trim(), bullets: [] as string[], split: false };
 };
 
 export const composeIdeaText = (f: Pick<IdeaFields, 'hook' | 'angle' | 'bullets'>) =>
@@ -50,10 +65,11 @@ export const mapTagsToBrands = (tags: string[], brands: { id: string; name: stri
   const add = (id: string) => { if (!out.includes(id)) out.push(id); };
   for (const tag of tags) {
     const key = norm(tag);
-    if (key.length < 3) continue;
+    if (!key) continue;
     const mapped = Object.entries(extra).find(([k]) => norm(k) === key)?.[1];
-    if (mapped) { add(mapped); continue; }
-    const hit = brands.find((b) => norm(b.name) === key || norm(b.name).startsWith(key));
+    if (mapped && brands.some((b) => b.id === mapped)) { add(mapped); continue; }
+    if (key.length < 3) continue;
+    const hit = brands.find((b) => norm(b.name) === key) || brands.find((b) => norm(b.name).startsWith(key));
     if (hit) add(hit.id);
   }
   return out;

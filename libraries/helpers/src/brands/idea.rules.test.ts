@@ -18,6 +18,14 @@ test('old free text splits into hook, angle and bullets; unstructured text falls
   assert.equal(loose.angle, 'A system removes the copying.');
   assert.equal(loose.split, false);
   assert.equal(parseIdeaText('x'.repeat(300)).hook.length, 160);
+  assert.deepEqual(parseIdeaText('Hook: H\r\nAngle: A\r\nBullets:\r\n- a\r\n- b'), { hook: 'H', angle: 'A', bullets: ['a', 'b'], split: true });
+  assert.deepEqual(parseIdeaText('Hook: H\nAngle: A\nBullets: - inline'), { hook: 'H', angle: 'A', bullets: ['inline'], split: true });
+  assert.equal(parseIdeaText('Hook: H only').hook, 'H only');
+  assert.equal(parseIdeaText('Intro text\nHook: H\nAngle: A').split, false);
+  const started = Date.now();
+  parseIdeaText('Hook: ' + '\n '.repeat(5000) + 'x');
+  parseIdeaText('Hook: H\nAngle: ' + '\n '.repeat(5000));
+  assert.ok(Date.now() - started < 500, 'long blank runs parse at once');
 });
 
 test('fields compose back into the old text form', () => {
@@ -32,6 +40,10 @@ test('tags map to brands by name or by the map sent in the request; short or unk
   assert.deepEqual(mapTagsToBrands(['Acme', 'optima', 'Process & control design', 'ai'], brands), ['acc', 'opt']);
   assert.deepEqual(mapTagsToBrands(['JDCo'], brands, { jdco: 'own' }), ['own']);
   assert.deepEqual(mapTagsToBrands([], brands), []);
+  assert.deepEqual(mapTagsToBrands(['ab'], brands, { ab: 'own' }), ['own']);
+  assert.deepEqual(mapTagsToBrands(['JDCo'], brands, { jdco: 'nope' }), []);
+  const acme = [{ id: '1', name: 'Acme Systems' }, { id: '2', name: 'Acme' }];
+  assert.deepEqual(mapTagsToBrands(['acme'], acme), ['2']);
 });
 
 test('topic comes from the first topic tag, else AI, else General', () => {
