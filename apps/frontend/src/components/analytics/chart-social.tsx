@@ -21,6 +21,7 @@ export const ChartSocial: FC<{
   color?: 'purple' | 'green' | 'blue';
 }> = (props) => {
   const { data, color = 'purple' } = props;
+  // SANAD-BRANDS: light mode by default
   const [mode] = useCookie('mode', 'light');
 
   const list = useMemo(() => {

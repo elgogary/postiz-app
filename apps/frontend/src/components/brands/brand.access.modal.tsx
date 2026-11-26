@@ -11,9 +11,10 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
   const { show } = useToaster();
   const [approval, setApproval] = useState(true);
   const [people, setPeople] = useState<AccessPerson[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [changed, setChanged] = useState<Record<string, string>>({});
 
-  useEffect(() => { api.access(brandId).then((a) => { setApproval(a.requiresApproval); setPeople(a.people); }).catch((e) => show(errorText(e, t), 'warning')); }, [brandId]);
+  useEffect(() => { api.access(brandId).then((a) => { setApproval(a.requiresApproval); setPeople(a.people); setLoaded(true); }).catch((e) => show(errorText(e, t), 'warning')); }, [brandId]);
 
   const save = async () => {
     try {
@@ -61,7 +62,7 @@ export const BrandAccessModal: FC<{ brandId: string; close: () => void; onSaved:
       ))}
       <div className="flex justify-end gap-[8px]">
         <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px]" onClick={close}>{t('cancel', 'Cancel')}</button>
-        <button className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] bg-[#612BD3] text-white" onClick={save}>{t('save', 'Save')}</button>
+        <button disabled={!loaded} className="text-[13px] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] bg-[#612BD3] text-white disabled:opacity-50" onClick={save}>{t('save', 'Save')}</button>
       </div>
     </div>
   );

@@ -167,8 +167,8 @@ function checkedPosts(raw: unknown): Omit<PlanPost, 'pillars'>[] {
 
 const pillarTokens = (pillar: string) => pillar.split('·').map((x) => x.trim()).filter(Boolean);
 
-// A short form the plan itself also writes in full ("DT" next to "Digital Transformation", "Process" next to
-// "Process Engineering") is read as that full name. Only the plan's own words are used, never a fixed list.
+// A short form the plan itself also writes in full ("CN" next to "Cloud Native", "Data" next to
+// "Data Mesh") is read as that full name. Only the plan's own words are used, never a fixed list.
 function pillarNames(posts: { pillar: string }[]): (token: string) => string {
   const all = [...new Set(posts.flatMap((p) => pillarTokens(p.pillar)))];
   const initials = (x: string) => x.split(/\s+/).map((w) => w[0]).join('').toUpperCase();

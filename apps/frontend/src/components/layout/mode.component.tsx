@@ -7,6 +7,7 @@ import EventEmitter from 'events';
 export const modeEmitter = new EventEmitter();
 
 const ModeComponent = () => {
+  // SANAD-BRANDS: light mode by default
   const [mode, setMode] = useCookie('mode', 'light');
 
   const changeMode = useCallback(() => {

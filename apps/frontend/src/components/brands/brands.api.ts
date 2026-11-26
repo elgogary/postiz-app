@@ -8,11 +8,18 @@ export interface Channel { id: string; name: string; provider: string; picture: 
 export interface BrandSummary { id: string; name: string; channels: Channel[]; role: BrandRole; requiresApproval: boolean }
 export interface SectionData { content: string | null; rows: string[][] | null; note: string | null; updatedBy: string | null; updatedAt: string }
 export interface BrandDetail extends BrandSummary { sections: Record<string, SectionData> }
+export interface ImportSummary { dryRun: boolean; sections: string[]; rows: Record<string, number>; posts: number; replaces: string[] }
 export interface AccessPerson { userId: string; name: string; orgRole: string; access: 'VIEW' | 'CREATE' | 'APPROVE'; locked: boolean }
 
 // Arabic letters: base, supplement, extended-A, presentation forms A and B.
 export const AR = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-export const dirOf = (v: string) => (AR.test(v) ? 'rtl' : 'ltr');
+const AR_ALL = new RegExp(AR.source, 'g');
+// One rule for every text: right to left when it has at least as many Arabic letters as Latin letters (so an English
+// line with one Arabic name stays left to right); empty or letterless text is left to right.
+export const dirOf = (v: string) => {
+  const ar = (v.match(AR_ALL) || []).length;
+  return ar > 0 && ar >= (v.match(/[A-Za-z]/g) || []).length ? 'rtl' : 'ltr';
+};
 
 // A failed call carries the server's message when there is one, else only the status, so the toast can translate the fallback.
 export class BrandsApiError extends Error {
@@ -42,7 +49,7 @@ export const useBrandsApi = () => {
     access: (id: string) => send(`/brands/${id}/access`) as Promise<{ requiresApproval: boolean; people: AccessPerson[] }>,
     setAccess: (id: string, userId: string, role: string) => send(`/brands/${id}/access`, 'PUT', { userId, role }),
     setSettings: (id: string, requiresApproval: boolean) => send(`/brands/${id}/settings`, 'PUT', { requiresApproval }),
-    importPlan: (id: string, html: string, dryRun: boolean) => send(`/brands/${id}/import`, 'POST', { html, dryRun }),
+    importPlan: (id: string, html: string, dryRun: boolean) => send(`/brands/${id}/import`, 'POST', { html, dryRun }) as Promise<ImportSummary>,
   }), [send]);
 };
 // <<< SANAD-BRANDS

@@ -24,6 +24,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <body
         className={clsx(jakartaSans.className, 'light text-primary !bg-primary')}
       >
+        {/* SANAD-BRANDS: light mode by default */}
         <VariableContextComponent
           language="en"
           storageProvider={

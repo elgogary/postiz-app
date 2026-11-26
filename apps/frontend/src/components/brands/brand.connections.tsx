@@ -5,17 +5,24 @@ import { FC } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { BrandDetail } from './brands.api';
 
-interface Tile { label: string; count?: number | string; tab: string }
+interface Tile { label: string; count?: number | string; tab?: string }
 
 const Group: FC<{ title: string; tiles: Tile[]; go: (tab: string) => void }> = ({ title, tiles, go }) => (
   <div className="bg-sixth border border-fifth rounded-[8px] overflow-hidden">
     <h4 className="text-[13px] font-[600] text-customColor18 px-[16px] py-[8px] border-b border-fifth">{title}</h4>
-    {tiles.map((tile) => (
-      <button key={tile.label} onClick={() => go(tile.tab)} className="w-full flex items-center gap-[8px] px-[16px] min-h-[32px] text-[13px] text-start hover:bg-newColColor [&+button]:border-t [&+button]:border-fifth">
-        {tile.label}
-        {tile.count !== undefined && tile.count !== '' && <span className="text-[12px] px-[8px] rounded-[6px] bg-newColColor">{tile.count}</span>}
-      </button>
-    ))}
+    {tiles.map((tile) => {
+      const inside = (
+        <>
+          {tile.label}
+          {tile.count !== undefined && tile.count !== '' && <span className="text-[12px] px-[8px] rounded-[6px] bg-newColColor">{tile.count}</span>}
+        </>
+      );
+      const row = 'w-full flex items-center gap-[8px] px-[16px] min-h-[32px] text-[13px] text-start';
+      // A tile without a tab is a plain row: nothing to open, so it does not look like a button.
+      return tile.tab
+        ? <button key={tile.label} onClick={() => go(tile.tab!)} className={`${row} hover:bg-newColColor [&+*]:border-t [&+*]:border-fifth`}>{inside}</button>
+        : <div key={tile.label} className={`${row} [&+*]:border-t [&+*]:border-fifth`}>{inside}</div>;
+    })}
   </div>
 );
 
@@ -31,7 +38,7 @@ export const BrandConnections: FC<{ brand: BrandDetail; go: (tab: string) => voi
             { label: t('focus', 'Focus'), count: brand.sections.focus?.rows?.length ? `${brand.sections.focus.rows.length} ${t('weeks', 'weeks')}` : '', tab: 'focus' },
             { label: t('kpis', 'KPIs'), count: n('kpi'), tab: 'kpi' },
           ]} />
-          <Group title={t('channels', 'Channels')} go={go} tiles={brand.channels.map((c) => ({ label: c.name, tab: 'overview' }))} />
+          <Group title={t('channels', 'Channels')} go={go} tiles={brand.channels.map((c) => ({ label: c.name }))} />
         </div>
         <div className="grid gap-[24px]">
           <Group title={t('brand_book', 'Brand book')} go={go} tiles={[

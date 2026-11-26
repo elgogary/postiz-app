@@ -7,13 +7,16 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { AR, errorText, SectionData } from './brands.api';
+import { dirOf, errorText, SectionData } from './brands.api';
+
+// Only what the backend keeps (cleanHtml in brand.rules.ts): h3/h4, lists, bold, italic, underline, links, line breaks.
+const EDITOR_OPTIONS = { heading: { levels: [3, 4] as [3, 4] }, blockquote: false, code: false, codeBlock: false, strike: false, horizontalRule: false } as const;
 
 const withDirections = (html: string) => {
   if (typeof window === 'undefined' || !html) return html;
   const root = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').body.firstElementChild;
   if (!root) return html;
-  root.querySelectorAll('p, li, ul, ol, h3, h4, table').forEach((el) => el.setAttribute('dir', AR.test(el.textContent || '') ? 'rtl' : 'ltr'));
+  root.querySelectorAll('p, li, ul, ol, h3, h4, table').forEach((el) => el.setAttribute('dir', dirOf(el.textContent || '')));
   return root.innerHTML;
 };
 
@@ -24,7 +27,7 @@ export const BrandTextSection: FC<{
   const { show } = useToaster();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const editor = useEditor({ extensions: [StarterKit], content: data?.content || '', immediatelyRender: false });
+  const editor = useEditor({ extensions: [StarterKit.configure(EDITOR_OPTIONS)], content: data?.content || '', immediatelyRender: false });
   const inner = useMemo(() => ({ __html: withDirections(data?.content || '') }), [data?.content]);
 
   useEffect(() => { if (editing) editor?.commands.setContent(data?.content || ''); }, [editing]);

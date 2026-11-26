@@ -54,6 +54,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <body
         className={clsx(jakartaSans.className, 'light text-primary !bg-primary')}
       >
+        {/* SANAD-BRANDS: light mode by default */}
         <VariableContextComponent
           storageProvider={
             process.env.STORAGE_PROVIDER! as 'local' | 'cloudflare'

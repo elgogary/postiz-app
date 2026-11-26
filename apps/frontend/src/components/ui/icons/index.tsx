@@ -770,6 +770,7 @@ export const VerticalDividerIcon: FC<IconProps> = ({ className, ...props }) => (
 );
 
 export const NoMediaIcon: FC = () => {
+  // SANAD-BRANDS: light mode by default
   const [mode, setMode] = useCookie('mode', 'light');
 
   useEffect(() => {

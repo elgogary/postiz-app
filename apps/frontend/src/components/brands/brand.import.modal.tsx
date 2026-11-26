@@ -4,9 +4,7 @@
 import { FC, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { errorText, useBrandsApi } from './brands.api';
-
-interface Summary { sections: string[]; rows: Record<string, number>; posts: number }
+import { errorText, ImportSummary, useBrandsApi } from './brands.api';
 
 const SECTION_LABELS: Record<string, string> = {
   summary: 'Summary', voice: 'Voice', routine: 'Engagement', profile: 'Profile tips', pillars: 'Pillars',
@@ -18,7 +16,7 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
   const api = useBrandsApi();
   const { show } = useToaster();
   const [html, setHtml] = useState('');
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const sectionName = (k: string) => t(`brand_section_${k}`, SECTION_LABELS[k] || k);
 
@@ -48,6 +46,7 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
           <b>{t('this_will_write', 'This will write')}</b>
           <span>{t('text_sections', 'Text sections')}: {summary.sections.map(sectionName).join(', ')}</span>
           {Object.entries(summary.rows).map(([k, v]) => <span key={k}>{sectionName(k)}: {v} {t('rows', 'rows')}</span>)}
+          {summary.replaces.length > 0 && <span>{t('replaces_now', 'Replaces what is there now')}: {summary.replaces.map(sectionName).join(', ')}</span>}
           <span className="text-customColor18">{summary.posts} {t('posts_next_step', 'posts in the plan (added with the review loop)')}</span>
         </div>
       )}

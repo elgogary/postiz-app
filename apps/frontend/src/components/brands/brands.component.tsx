@@ -1,6 +1,6 @@
 'use client';
 // >>> SANAD-BRANDS: Brands page shell (brand avatars, header, tabs). Prototype: docs/prototypes/postiz/brand-profile.
-import { FC, useCallback, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
@@ -42,21 +42,31 @@ export const Brands: FC = () => {
     router.replace(`/brands?${q.toString()}`);
   }, [current, router]);
 
+  // Only the newest request may set state: a slow answer for a brand or tab left behind is dropped.
+  const seq = useRef(0);
+  const notify = useRef({ show, t });
+  notify.current = { show, t };
+  const wanted = params.get('brand') || '';
+
   const load = useCallback(async () => {
+    const mine = ++seq.current;
     try {
       const list = await api.list();
+      const id = wanted || list[0]?.id;
+      const detail = id ? await api.get(id) : null;
+      if (mine !== seq.current) return;
       setBrands(list);
-      const id = params.get('brand') || list[0]?.id;
-      setBrand(id ? await api.get(id) : null);
+      setBrand(detail);
       setFailed(false);
     } catch (e) {
+      if (mine !== seq.current) return;
       setBrands((b) => b ?? []);
       setFailed(true);
-      show(errorText(e, t), 'warning');
+      notify.current.show(errorText(e, notify.current.t), 'warning');
     }
-  }, [api, show, params, t]);
+  }, [api, wanted]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); return () => { seq.current += 1; }; }, [load]);
 
   if (!brands) return <div className="p-[24px] text-customColor18">{t('loading', 'Loading…')}</div>;
   if (failed && !brands.length) {
@@ -71,25 +81,33 @@ export const Brands: FC = () => {
     return <div className="p-[24px] text-[14px] text-customColor18">{t('no_brands', 'No brands yet. Group your channels by brand: on a channel, open its menu and choose "Move / add to group".')}</div>;
   }
 
-  const may = brand ? canEdit(brand.role) : false;
-  const saveText = (key: string) => async (html: string) => { await api.saveText(current, key, html); await load(); };
-  const saveRows = (key: string) => async (rows: string[][]) => { await api.saveRows(current, key, rows); await load(); };
+  // The page shows a brand only once its own data is here; until then nothing of the previous brand is editable.
+  const ready = brand && brand.id === current ? brand : null;
+  const may = ready ? canEdit(ready.role) : false;
+  const saveText = (id: string, key: string) => async (html: string) => { await api.saveText(id, key, html); await load(); };
+  const saveRows = (id: string, key: string) => async (rows: string[][]) => { await api.saveRows(id, key, rows); await load(); };
   const label = (k: string) => t(k, TABS.find(([key]) => key === k)?.[1] || k);
 
   const body = () => {
-    if (!brand) return null;
-    if (tab === 'overview') return <BrandConnections brand={brand} go={(k) => go({ tab: k })} />;
+    if (!ready) {
+      return failed
+        ? <button className="self-start text-[13px] font-[600] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] border border-fifth" onClick={load}>{t('try_again', 'Try again')}</button>
+        : <div className="text-customColor18">{t('loading', 'Loading…')}</div>;
+    }
+    const b = ready;
+    const key = `${b.id}:${tab}`;
+    if (tab === 'overview') return <BrandConnections key={key} brand={b} go={(k) => go({ tab: k })} />;
     if (tab === 'summary') {
       return (
-        <div className="flex flex-col gap-[24px]">
-          <BrandRowsSection sectionKey="pillars" label={t('pillars', 'Pillars')} data={brand.sections.pillars} canEdit={may} onSave={saveRows('pillars')} />
-          <BrandTextSection label={label('summary')} data={brand.sections.summary} canEdit={may} onSave={saveText('summary')} />
+        <div key={key} className="flex flex-col gap-[24px]">
+          <BrandRowsSection key={`${key}:pillars`} sectionKey="pillars" label={t('pillars', 'Pillars')} data={b.sections.pillars} canEdit={may} onSave={saveRows(b.id, 'pillars')} />
+          <BrandTextSection key={`${key}:text`} label={label('summary')} data={b.sections.summary} canEdit={may} onSave={saveText(b.id, 'summary')} />
         </div>
       );
     }
-    if (tab === 'focus') return <BrandFocus data={brand.sections.focus} canEdit={may} onSave={saveRows('focus')} />;
-    if (isRowSection(tab)) return <BrandRowsSection sectionKey={tab as RowSectionKey} label={label(tab)} data={brand.sections[tab]} canEdit={may} onSave={saveRows(tab)} />;
-    return <BrandTextSection label={label(tab)} data={brand.sections[tab]} canEdit={may} onSave={saveText(tab)} />;
+    if (tab === 'focus') return <BrandFocus key={key} data={b.sections.focus} canEdit={may} onSave={saveRows(b.id, 'focus')} />;
+    if (isRowSection(tab)) return <BrandRowsSection key={key} sectionKey={tab as RowSectionKey} label={label(tab)} data={b.sections[tab]} canEdit={may} onSave={saveRows(b.id, tab)} />;
+    return <BrandTextSection key={key} label={label(tab)} data={b.sections[tab]} canEdit={may} onSave={saveText(b.id, tab)} />;
   };
 
   return (
@@ -106,25 +124,25 @@ export const Brands: FC = () => {
         <select aria-label={t('brand', 'Brand')} className="hidden mobile:block min-h-[44px] bg-input border border-fifth rounded-[8px] px-[8px]" value={current} onChange={(e) => go({ brand: e.target.value })}>
           {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        {brand && (
+        {ready && (
           <div className="flex items-center gap-[16px] flex-wrap">
             <div>
-              <div className="text-[20px] font-[600]"><span className="text-customColor18 font-[500]">{t('brands', 'Brands')} /</span> {brand.name}</div>
+              <div className="text-[20px] font-[600]"><span className="text-customColor18 font-[500]">{t('brands', 'Brands')} /</span> {ready.name}</div>
               <div className="flex gap-[8px] items-center text-[13px] text-customColor18 mt-[8px] flex-wrap">
-                <span>{brand.channels.map((c) => c.name).join(' · ')}</span>
-                <span className="px-[8px] py-[4px] rounded-[6px] border border-fifth">{brand.requiresApproval ? t('posts_need_approval', 'Posts need approval') : t('no_approval_step', 'No approval step')}</span>
-                <span className="px-[8px] py-[4px] rounded-[6px] border border-fifth">{brand.role === 'approve' ? t('you_approve', 'You approve') : brand.role === 'create' ? t('you_create', 'You create') : t('view_only', 'View only')}</span>
+                <span>{ready.channels.map((c) => c.name).join(' · ')}</span>
+                <span className="px-[8px] py-[4px] rounded-[6px] border border-fifth">{ready.requiresApproval ? t('posts_need_approval', 'Posts need approval') : t('no_approval_step', 'No approval step')}</span>
+                <span className="px-[8px] py-[4px] rounded-[6px] border border-fifth">{ready.role === 'approve' ? t('you_approve', 'You approve') : ready.role === 'create' ? t('you_create', 'You create') : t('view_only', 'View only')}</span>
               </div>
             </div>
             {isAdmin && (
               <div className="ms-auto flex gap-[8px]">
                 <button className="text-[13px] font-[600] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] border border-fifth" onClick={() => modals.openModal({
                   title: t('import_plan', 'Import plan'), closeOnClickOutside: true, closeOnEscape: true,
-                  children: (close: () => void) => <BrandImportModal brandId={current} close={close} onDone={load} />,
+                  children: (close: () => void) => <BrandImportModal brandId={ready.id} close={close} onDone={load} />,
                 })}>{t('import_plan', 'Import plan')}</button>
                 <button className="text-[13px] font-[600] px-[16px] h-[36px] max-[480px]:h-[44px] rounded-[8px] border border-fifth" onClick={() => modals.openModal({
-                  title: `${t('access_and_approval', 'Access and approval')} · ${brand.name}`, closeOnClickOutside: true, closeOnEscape: true,
-                  children: (close: () => void) => <BrandAccessModal brandId={current} close={close} onSaved={load} />,
+                  title: `${t('access_and_approval', 'Access and approval')} · ${ready.name}`, closeOnClickOutside: true, closeOnEscape: true,
+                  children: (close: () => void) => <BrandAccessModal brandId={ready.id} close={close} onSaved={load} />,
                 })}>{t('access', 'Access')}</button>
               </div>
             )}
