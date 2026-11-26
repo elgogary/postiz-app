@@ -92,5 +92,9 @@ export class BrandsRepository {
       select: { role: true, user: { select: { id: true, name: true, email: true } } },
     });
   }
+
+  sectionsByKey(orgId: string, key: string) {
+    return this._prisma.model.brandSection.findMany({ where: { orgId, key }, select: { customerId: true, rows: true } });
+  }
 }
 // <<< SANAD-BRANDS
