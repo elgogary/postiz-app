@@ -94,11 +94,19 @@ export class BrandPostsRepository {
     return this._prisma.model.postBrief.update({ where: { id }, data });
   }
 
-  waiting(orgId: string) {
-    return this._prisma.model.postBrief.findMany({
-      where: { orgId, review: { in: ['IN_REVIEW', 'SENT_BACK'] } },
-      select: { customerId: true, review: true, sentById: true },
+  // Only briefs whose post still exists wait on someone: a post deleted in Postiz leaves its brief behind.
+  async waiting(orgId: string) {
+    const open = await this._prisma.model.postBrief.findMany({
+      where: { orgId, review: { in: ['IN_REVIEW', 'SENT_BACK'] }, postId: { not: null } },
+      select: { customerId: true, review: true, sentById: true, postId: true },
     });
+    if (!open.length) return [];
+    const live = await this._prisma.model.post.findMany({
+      where: { id: { in: open.map((b) => b.postId as string) }, organizationId: orgId, deletedAt: null },
+      select: { id: true },
+    });
+    const ids = new Set(live.map((p) => p.id));
+    return open.filter((b) => ids.has(b.postId as string));
   }
 }
 // <<< SANAD-BRANDS

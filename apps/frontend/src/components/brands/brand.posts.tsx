@@ -32,7 +32,7 @@ export const BrandPostsTab: FC<{
       {shown.length === 0 ? (
         <div className="flex items-center gap-[16px] text-[14px] text-customColor18">
           {t('no_posts_here', 'No posts here yet.')}
-          {onNew && <button className="text-[13px] px-[16px] h-[36px] rounded-[8px] bg-[#612BD3] text-white" onClick={onNew}>{t('new_post', 'New post')}</button>}
+          {onNew && <button className="text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] bg-[#612BD3] text-white" onClick={onNew}>{t('new_post', 'New post')}</button>}
         </div>
       ) : shown.map((c) => (
         <BrandPostCard key={c.key} brandId={brandId} card={c} role={data.role} requiresApproval={data.requiresApproval}

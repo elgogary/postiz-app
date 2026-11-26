@@ -65,7 +65,8 @@ export class BrandReviewService {
     return {
       window, role: ctx.role, requiresApproval: ctx.requiresApproval, checks: ctx.checks,
       channels: ctx.channels.map((c) => ({ id: c.id, name: c.name })),
-      cards: buildCards(briefs.map(asBrief), rows, names),
+      // A brief made only to hold a post's review (no planRef) disappears with its post; a plan item stays as Planned.
+      cards: buildCards(briefs.filter((b) => b.planRef || (b.postId && rows.some((r) => r.id === b.postId))).map(asBrief), rows, names),
     };
   }
 
