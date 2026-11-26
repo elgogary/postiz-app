@@ -1,6 +1,7 @@
 // >>> SANAD-BRANDS: ideas (spec rule 8): list, add, edit, drop and restore, migrate the old free-text ideas, and plan
 // an idea into a brand (rule 7: the AI first draft). Rights come from BrandsService; every read is org-scoped.
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ContentIdea } from '@prisma/client';
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandIdeasRepository, LIST_CAP } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.ideas.repository';
@@ -22,10 +23,15 @@ const asRow = (r: ContentIdea): IdeaRow => ({
   format: r.format, status: r.status, briefId: r.briefId,
 });
 
+const DAY = 86400000;
+const MIGRATE_CHUNK = 500;
+
 const list20 = (v: string[] | undefined) => (v || []).map((x) => x.trim()).filter(Boolean).slice(0, 20);
 
 @Injectable()
 export class BrandIdeasService {
+  private readonly _log = new Logger('BrandIdeasService');
+
   constructor(private _brands: BrandsService, private _repo: BrandIdeasRepository, private _posts: BrandPostsRepository,
     private _review: BrandReviewService, private _drafts: BrandDraftService) {}
 
@@ -132,7 +138,9 @@ export class BrandIdeasService {
     });
     const summary = { total: rows.length, split, noBrand, byBrand, byTopic };
     if (dto.dryRun) return { dryRun: true, ...summary };
-    await this._repo.saveAll(ops.map((op) => op()));
+    // One transaction per chunk keeps each under the transaction timeout; a run cut short is finished by the next run,
+    // which reads only the rows still without a hook.
+    for (let i = 0; i < ops.length; i += MIGRATE_CHUNK) await this._repo.saveAll(ops.slice(i, i + MIGRATE_CHUNK).map((op) => op()));
     return { dryRun: false, ...summary };
   }
 
@@ -148,38 +156,41 @@ export class BrandIdeasService {
     if (idea.brandIds.length && !idea.brandIds.includes(dto.customerId)) throw new BadRequestException('This idea is not for this brand');
     const when = Date.parse(dto.date);
     if (Number.isNaN(when)) throw new BadRequestException('Pick the date');
-    if (when < Date.now()) throw new BadRequestException('Pick a date that has not passed');
-    if (!(await this._repo.claim(orgId, id))) throw new BadRequestException('This idea was planned a moment ago');
-    let brief: { id: string };
+    // A day picked as a bare date parses as UTC midnight; the day of grace keeps "today" valid in every time zone.
+    if (when < Date.now() - DAY) throw new BadRequestException('Pick a date that has not passed');
+    const briefId = randomUUID();
+    const brandIds = idea.brandIds.includes(dto.customerId) ? idea.brandIds : [...idea.brandIds, dto.customerId];
+    if (!(await this._repo.claim(orgId, id, briefId, brandIds))) throw new BadRequestException('This idea was planned a moment ago');
     try {
-      brief = await this._posts.createBrief({
-        orgId, customerId: dto.customerId, ideaId: id, plannedAt: new Date(when), format: dto.format, title: idea.hook,
+      await this._posts.createBrief({
+        id: briefId, orgId, customerId: dto.customerId, ideaId: id, plannedAt: new Date(when), format: dto.format, title: idea.hook,
         sub: idea.angle, slides: idea.bullets, pillars: idea.pillars,
       });
     } catch (e) {
-      await this._repo.update(orgId, id, { status: 'NEW' });
+      await this._repo.update(orgId, id, { status: 'NEW', briefId: null, brandIds: idea.brandIds }).catch(() => undefined);
       throw e;
     }
-    await this._repo.update(orgId, id, {
-      briefId: brief.id,
-      brandIds: idea.brandIds.includes(dto.customerId) ? idea.brandIds : [...idea.brandIds, dto.customerId],
-    });
-    let firstDraft = false;
-    if (dto.ai) {
+    const firstDraft = dto.ai && ctx.channels.length > 0 && await this.firstDraft(orgId, userId, orgRole, dto, ctx.customer.name, idea, briefId);
+    return { briefId, firstDraft, aiFailed: dto.ai && !firstDraft };
+  }
+
+  // Rule 7: any failure here (the AI, saving its text, making the Draft) leaves the idea planned and reports the draft
+  // as failed; text the AI wrote stays on the planned post, so a Draft made later from Posts starts from it.
+  private async firstDraft(orgId: string, userId: string, orgRole: OrgRole, dto: PlanIdeaDto, brand: string, idea: IdeaView, briefId: string) {
+    try {
       const book = await this._brands.get(orgId, userId, orgRole, dto.customerId);
       const checks = ((book.sections.review?.rows as string[][] | null) || []).map((r) => (r[0] || '').trim()).filter(Boolean);
-      const draft = await this._drafts.write({
-        brand: ctx.customer.name, voice: book.sections.voice?.content || '', checks, idea, format: dto.format,
+      const draft = await this._drafts.write({ brand, voice: book.sections.voice?.content || '', checks, idea, format: dto.format });
+      if (!draft) return false;
+      await this._posts.updateBrief(briefId, {
+        caption: draft.caption, slides: draft.slides, slidesLabel: draft.slidesLabel, verify: DRAFT_VERIFY, firstDraft: true,
       });
-      if (draft) {
-        await this._posts.updateBrief(brief.id, {
-          caption: draft.caption, slides: draft.slides, slidesLabel: draft.slidesLabel, verify: DRAFT_VERIFY, firstDraft: true,
-        });
-        await this._review.createDraft(orgId, userId, orgRole, dto.customerId, brief.id, { date: dto.date });
-        firstDraft = true;
-      }
+      await this._review.createDraft(orgId, userId, orgRole, dto.customerId, briefId, { date: dto.date });
+      return true;
+    } catch (e) {
+      this._log.warn(`Plan it: the first draft was not made: ${(e as Error).message}`);
+      return false;
     }
-    return { briefId: brief.id, firstDraft, aiFailed: dto.ai && !firstDraft };
   }
 }
 // <<< SANAD-BRANDS

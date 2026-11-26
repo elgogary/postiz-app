@@ -10,14 +10,14 @@ const ideaRow = (over: Record<string, unknown> = {}) => ({
   deletedAt: null, hook: '', angle: '', bullets: [], brandIds: ['acc'], topic: '', pillars: [], format: '', status: 'NEW', briefId: null, ...over,
 });
 
-function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: unknown; orgRole?: string; claimed?: boolean } = {}) {
+function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: unknown; orgRole?: string; claimed?: boolean; briefFails?: boolean; draftFails?: boolean; channels?: { id: string }[] } = {}) {
   const calls: unknown[][] = [];
   const rows = opts.rows || [ideaRow()];
   const brands = {
     list: async () => [{ id: 'acc', name: 'Acme', role: opts.role || 'create' }, { id: 'opt', name: 'Optima', role: 'view' }],
     context: async (_o: string, _u: string, _r: string, customerId: string) => {
       if (!['acc', 'opt'].includes(customerId)) throw new NotFoundException('Brand not found');
-      return { customer: { id: customerId, name: customerId === 'acc' ? 'Acme' : 'Optima' }, role: customerId === 'acc' ? (opts.role || 'create') : 'view', requiresApproval: true, channels: [{ id: 'ch1' }], focusRows: [], checks: 1 };
+      return { customer: { id: customerId, name: customerId === 'acc' ? 'Acme' : 'Optima' }, role: customerId === 'acc' ? (opts.role || 'create') : 'view', requiresApproval: true, channels: opts.channels || [{ id: 'ch1' }], focusRows: [], checks: 1 };
     },
     get: async () => ({ sections: { voice: { content: '<p>Short.</p>' }, review: { rows: [['No client names']] } } }),
     pillarsByBrand: async () => ({ acc: ['Ops'] }),
@@ -28,17 +28,17 @@ function setup(opts: { role?: string; rows?: Record<string, unknown>[]; draft?: 
     idea: async (_o: string, id: string) => rows.find((r) => r.id === id) || null,
     create: async (data: Record<string, unknown>) => { calls.push(['create', data]); return { ...ideaRow(), ...data, id: 'new' }; },
     update: async (_o: string, id: string, data: Record<string, unknown>) => { calls.push(['update', id, data]); return { ...rows.find((r) => r.id === id), ...data }; },
-    claim: async (_o: string, id: string) => { calls.push(['claim', id]); return opts.claimed !== false; },
+    claim: async (_o: string, id: string, briefId: string, brandIds: string[]) => { calls.push(['claim', id, briefId, brandIds]); return opts.claimed !== false; },
     updateOp: (_o: string, id: string, data: Record<string, unknown>) => { calls.push(['updateOp', id, data]); return {}; },
     saveAll: async (ops: unknown[]) => { calls.push(['saveAll', ops.length]); return []; },
     plans: async () => [{ briefId: 'b9', brandId: 'acc', date: FUTURE, postId: 'p9', postState: 'PUBLISHED' }],
   };
   const posts = {
-    createBrief: async (data: Record<string, unknown>) => { calls.push(['createBrief', data]); return { id: 'bNew' }; },
+    createBrief: async (data: Record<string, unknown>) => { calls.push(['createBrief', data]); if (opts.briefFails) throw new Error('db down'); return { id: data.id }; },
     updateBrief: async (id: string, data: Record<string, unknown>) => { calls.push(['updateBrief', id, data]); return {}; },
   };
-  const review = { createDraft: async (...a: unknown[]) => { calls.push(['createDraft', ...a]); return { postId: 'pNew' }; } };
-  const drafts = { write: async () => (opts.draft === undefined ? { caption: 'Cap', slidesLabel: 'Slides', slides: ['s'] } : opts.draft) };
+  const review = { createDraft: async (...a: unknown[]) => { calls.push(['createDraft', ...a]); if (opts.draftFails) throw new BadRequestException('This brand has no channel yet'); return { postId: 'pNew' }; } };
+  const drafts = { write: async () => { calls.push(['write']); return opts.draft === undefined ? { caption: 'Cap', slidesLabel: 'Slides', slides: ['s'] } : opts.draft; } };
   const svc = new BrandIdeasService(brands as never, repo as never, posts as never, review as never, drafts as never);
   return { svc, calls, args: ['o', 'u1', (opts.orgRole || 'USER')] as const };
 }
@@ -95,18 +95,40 @@ test('migrate: admins only; the dry run reports and writes nothing; tags map to 
 test('plan it: AI on writes a first draft; AI failing still plans; only a new idea of this brand; viewers cannot', async () => {
   const s = setup();
   const res = await s.svc.plan(...s.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Carousel', ai: true });
-  assert.deepEqual(res, { briefId: 'bNew', firstDraft: true, aiFailed: false });
-  assert.deepEqual(s.calls.map((c) => c[0]), ['claim', 'createBrief', 'update', 'updateBrief', 'createDraft']);
-  assert.equal((s.calls[1][1] as { ideaId: string }).ideaId, 'i1');
-  assert.deepEqual(s.calls[2][2], { briefId: 'bNew', brandIds: ['acc'] });
+  assert.deepEqual(s.calls.map((c) => c[0]), ['claim', 'createBrief', 'write', 'updateBrief', 'createDraft']);
+  const [, , briefId, brandIds] = s.calls[0] as [string, string, string, string[]];
+  assert.deepEqual(res, { briefId, firstDraft: true, aiFailed: false });
+  assert.deepEqual(brandIds, ['acc']);
+  assert.deepEqual([(s.calls[1][1] as { id: string }).id, (s.calls[1][1] as { ideaId: string }).ideaId], [briefId, 'i1']);
   assert.equal((s.calls[3][2] as { firstDraft: boolean }).firstDraft, true);
+
+  const today = new Date().toISOString().slice(0, 10);
+  assert.equal((await setup().svc.plan(...s.args, 'i1', { customerId: 'acc', date: today, format: 'Text', ai: false })).firstDraft, false);
   await assert.rejects(setup().svc.plan(...s.args, 'i1', { customerId: 'acc', date: '2020-01-01T00:00:00Z', format: 'Text', ai: false }), BadRequestException);
+
   const lost = setup({ claimed: false });
   await assert.rejects(lost.svc.plan(...lost.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: false }), BadRequestException);
   assert.ok(!lost.calls.some((c) => c[0] === 'createBrief'));
+
+  const broken = setup({ briefFails: true });
+  await assert.rejects(broken.svc.plan(...broken.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true }), /db down/);
+  assert.deepEqual(broken.calls.at(-1), ['update', 'i1', { status: 'NEW', briefId: null, brandIds: ['acc'] }]);
+
   const failed = setup({ draft: null });
-  assert.deepEqual(await failed.svc.plan(...failed.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true }), { briefId: 'bNew', firstDraft: false, aiFailed: true });
+  const f = await failed.svc.plan(...failed.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true });
+  assert.deepEqual([f.firstDraft, f.aiFailed], [false, true]);
   assert.ok(!failed.calls.some((c) => c[0] === 'createDraft'));
+
+  const noDraft = setup({ draftFails: true });
+  const n = await noDraft.svc.plan(...noDraft.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true });
+  assert.deepEqual([n.firstDraft, n.aiFailed], [false, true]);
+  assert.ok(noDraft.calls.some((c) => c[0] === 'updateBrief'), 'the AI text stays on the planned post');
+
+  const noChannel = setup({ channels: [] });
+  const c = await noChannel.svc.plan(...noChannel.args, 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: true });
+  assert.deepEqual([c.firstDraft, c.aiFailed], [false, true]);
+  assert.ok(!noChannel.calls.some((x) => x[0] === 'write'), 'no AI call when there is no channel to draft on');
+
   await assert.rejects(setup({ rows: [ideaRow({ status: 'PLANNED', briefId: 'b1' })] }).svc.plan('o', 'u1', 'USER', 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: false }), BadRequestException);
   await assert.rejects(setup({ rows: [ideaRow({ brandIds: ['zz'] })] }).svc.plan('o', 'u1', 'USER', 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: false }), BadRequestException);
   await assert.rejects(setup({ role: 'view' }).svc.plan('o', 'u1', 'USER', 'i1', { customerId: 'acc', date: FUTURE, format: 'Text', ai: false }), ForbiddenException);

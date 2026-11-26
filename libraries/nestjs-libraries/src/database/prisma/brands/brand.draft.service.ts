@@ -14,7 +14,7 @@ export class BrandDraftService {
     if (!key || key === 'sk-proj-') return null;
     const { system, user } = draftPrompt(input);
     try {
-      const client = new OpenAI({ apiKey: key, timeout: 60000, maxRetries: 1 });
+      const client = new OpenAI({ apiKey: key, timeout: 25000, maxRetries: 0 });
       const res = await client.chat.completions.create({
         model: process.env.BRANDS_AI_MODEL || process.env.AGENT_AI_MODEL || 'deepseek-chat',
         temperature: 0.7,

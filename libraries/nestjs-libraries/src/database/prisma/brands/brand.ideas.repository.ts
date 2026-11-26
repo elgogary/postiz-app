@@ -34,10 +34,11 @@ export class BrandIdeasRepository {
     return this.idea(orgId, id);
   }
 
-  // Marks a new idea Planned only if it is still new, so two clicks on Plan it make one planned post.
-  async claim(orgId: string, id: string) {
+  // Marks a new idea Planned, with its brief id and brands, only if it is still new: two clicks on Plan it make one
+  // planned post, and the idea never reads Planned without the id of its brief.
+  async claim(orgId: string, id: string, briefId: string, brandIds: string[]) {
     const r = await this._prisma.model.contentIdea.updateMany({
-      where: { id, organizationId: orgId, deletedAt: null, status: 'NEW', briefId: null }, data: { status: 'PLANNED' },
+      where: { id, organizationId: orgId, deletedAt: null, status: 'NEW', briefId: null }, data: { status: 'PLANNED', briefId, brandIds },
     });
     return r.count === 1;
   }
