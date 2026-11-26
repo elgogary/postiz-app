@@ -8,6 +8,11 @@ import { errorText, useBrandsApi } from './brands.api';
 
 interface Summary { sections: string[]; rows: Record<string, number>; posts: number }
 
+const SECTION_LABELS: Record<string, string> = {
+  summary: 'Summary', voice: 'Voice', routine: 'Engagement', profile: 'Profile tips', pillars: 'Pillars',
+  bench: 'Benchmark', kpi: 'KPIs', review: 'Before publishing', history: 'Past posts', focus: 'Focus',
+};
+
 export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: () => void }> = ({ brandId, close, onDone }) => {
   const t = useT();
   const api = useBrandsApi();
@@ -15,6 +20,7 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
   const [html, setHtml] = useState('');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [busy, setBusy] = useState(false);
+  const sectionName = (k: string) => t(`brand_section_${k}`, SECTION_LABELS[k] || k);
 
   const pick = async (file?: File) => {
     if (!file) return;
@@ -40,8 +46,8 @@ export const BrandImportModal: FC<{ brandId: string; close: () => void; onDone: 
       {summary && (
         <div className="text-[13px] border border-fifth rounded-[8px] p-[16px] flex flex-col gap-[4px]">
           <b>{t('this_will_write', 'This will write')}</b>
-          <span>{t('text_sections', 'Text sections')}: {summary.sections.join(', ')}</span>
-          {Object.entries(summary.rows).map(([k, v]) => <span key={k}>{k}: {v} {t('rows', 'rows')}</span>)}
+          <span>{t('text_sections', 'Text sections')}: {summary.sections.map(sectionName).join(', ')}</span>
+          {Object.entries(summary.rows).map(([k, v]) => <span key={k}>{sectionName(k)}: {v} {t('rows', 'rows')}</span>)}
           <span className="text-customColor18">{summary.posts} {t('posts_next_step', 'posts in the plan (added with the review loop)')}</span>
         </div>
       )}
