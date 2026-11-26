@@ -31,12 +31,18 @@ function literalToJson(src: string): string {
   for (let i = 0; i < src.length;) {
     const c = src[i];
     if (c === '"' || c === "'" || c === '`') {
-      let j = i + 1, raw = '';
+      let j = i + 1, text = '';
       while (j < src.length && src[j] !== c) {
-        if (src[j] === '\\' && j + 1 < src.length) { raw += src.slice(j, j + 2); j += 2; continue; }
-        raw += src[j]; j += 1;
+        if (src[j] !== '\\') { text += src[j]; j += 1; continue; }
+        const e = src[j + 1];
+        const simple: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', '/': '/', '\\': '\\', '"': '"', "'": "'", '`': '`' };
+        if (e in simple) { text += simple[e]; j += 2; }
+        else if (e === 'x' && /^[0-9a-fA-F]{2}$/.test(src.slice(j + 2, j + 4))) { text += String.fromCharCode(parseInt(src.slice(j + 2, j + 4), 16)); j += 4; }
+        else if (e === 'u' && /^[0-9a-fA-F]{4}$/.test(src.slice(j + 2, j + 6))) { text += String.fromCharCode(parseInt(src.slice(j + 2, j + 6), 16)); j += 6; }
+        else throw new Error('Not plan data: a string holds an escape that is not plain text');
       }
-      out += JSON.stringify(JSON.parse(`"${raw.replace(/\\'/g, "'").replace(/\\`/g, '`').replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`));
+      if (j >= src.length) throw new Error('Not plan data: a string is not closed');
+      out += JSON.stringify(text);
       i = j + 1;
       continue;
     }
@@ -61,7 +67,10 @@ function readConst(script: string, name: string): unknown {
     if (q) { if (ch === '\\') { i += 1; } else if (ch === q) { q = ''; } continue; }
     if (ch === '"' || ch === "'" || ch === '`') q = ch;
     else if (ch === open) depth += 1;
-    else if (ch === close && --depth === 0) return JSON.parse(literalToJson(script.slice(start, i + 1)));
+    else if (ch === close && --depth === 0) {
+      const json = literalToJson(script.slice(start, i + 1));
+      try { return JSON.parse(json); } catch { throw new Error(`Not plan data: ${name} is not a plain list`); }
+    }
   }
   throw new Error(`Not plan data: ${name} is not closed`);
 }
@@ -105,10 +114,11 @@ function sectionHtml(page: string, id: string, ids: string[]): string {
 }
 
 function weekDates(range: string, year = 2026): [string, string] {
-  const [a, b] = range.split(/[–-]/).map((x) => x.trim());
+  const [a, b = ''] = range.split(/[–-]/).map((x) => x.trim());
   const [endDay, endMonthName] = b.split(/\s+/);
   const startBits = a.split(/\s+/);
   const endMonth = AR_MONTHS[endMonthName], startMonth = startBits[1] ? AR_MONTHS[startBits[1]] : endMonth;
+  if (!endMonth || !startMonth) throw new Error('Not plan data: a week range has a month that is not recognised');
   const pad = (n: number) => String(n).padStart(2, '0');
   return [`${year}-${pad(startMonth)}-${pad(Number(startBits[0]))}`, `${year}-${pad(endMonth)}-${pad(Number(endDay))}`];
 }

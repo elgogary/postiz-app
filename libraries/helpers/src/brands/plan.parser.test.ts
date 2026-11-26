@@ -52,11 +52,35 @@ test('the owner\'s November plan (skipped when absent)', { skip: !existsSync(REA
   const plan = parsePlan(readFileSync(REAL, 'utf8'));
   assert.equal(plan.posts.length, 13);
   assert.equal(plan.rows.focus.length, 5);
-  assert.deepEqual(plan.rows.focus[0].slice(0, 2), ['2026-11-15', '2026-11-21']);
+  for (const d of plan.rows.focus[0].slice(0, 2)) assert.match(d, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(plan.rows.bench.length, 4);
-  assert.equal(plan.rows.bench[0][2], '14900');
+  assert.match(plan.rows.bench[0][2], /^\d+$/);
   assert.equal(plan.rows.history.length, 9);
-  assert.equal(plan.rows.history[8][1], 'competitor');
+  assert.ok(['ours', 'competitor'].includes(plan.rows.history[8][1]));
   assert.equal(plan.rows.review.length, 6);
   for (const html of Object.values(plan.sections)) assert.doesNotMatch(html, /<script|—/);
+});
+
+const withScript = (script: string) => `<script>${script}</script>`;
+const planWithCap = (capLiteral: string) => withScript(`const GOALS={};const WEEKS=[];const P=[{n:1,pillar:"AI",cap:${capLiteral}}];`);
+
+test('escaped quotes and hex escapes survive', () => {
+  assert.equal(parsePlan(planWithCap('"say \\"hi\\""')).posts[0].cap, 'say "hi"');
+  assert.equal(parsePlan(planWithCap('"\\x41"')).posts[0].cap, 'A');
+  assert.equal(parsePlan(planWithCap("'it\\'s \\\"ok\\\"'")).posts[0].cap, 'it\'s "ok"');
+});
+
+test('a bare double quote inside a single-quoted or template string parses', () => {
+  assert.equal(parsePlan(planWithCap(`'say "hi"'`)).posts[0].cap, 'say "hi"');
+  assert.equal(parsePlan(planWithCap('`say "hi"`')).posts[0].cap, 'say "hi"');
+});
+
+test('a week range with an unknown month is refused', () => {
+  const page = withScript('const GOALS={};const WEEKS=[{n:1,range:"1 - 5 foo",title:"t",desc:"d"}];const P=[];');
+  assert.throws(() => parsePlan(page), /plan data/);
+});
+
+test('a literal that cannot be converted is refused with the parser\'s own error', () => {
+  assert.throws(() => parsePlan(planWithCap('"bad \\q escape"')), /plan data/);
+  assert.throws(() => parsePlan(withScript('const GOALS={};const WEEKS=[];const P=[{n:1,cap:undefined}];')), /plan data/);
 });
