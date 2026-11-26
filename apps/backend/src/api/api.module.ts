@@ -36,6 +36,7 @@ import { EngagementController } from '@gitroom/backend/api/routes/engagement.con
 // >>> SANAD-BRANDS
 import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
 import { BrandPostsController } from '@gitroom/backend/api/routes/brand.posts.controller';
+import { BrandIdeasController } from '@gitroom/backend/api/routes/brand.ideas.controller';
 // <<< SANAD-BRANDS
 import { SignatureController } from '@gitroom/backend/api/routes/signature.controller';
 import { AutopostController } from '@gitroom/backend/api/routes/autopost.controller';
@@ -73,6 +74,7 @@ const authenticatedController = [
   // >>> SANAD-BRANDS
   BrandsController,
   BrandPostsController,
+  BrandIdeasController,
   // <<< SANAD-BRANDS
   SignatureController,
   AutopostController,

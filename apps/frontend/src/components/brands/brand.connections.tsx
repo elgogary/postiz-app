@@ -36,6 +36,7 @@ export const BrandConnections: FC<{ brand: BrandDetail; posts: BrandPosts | null
         <div className="grid gap-[24px]">
           <Group title={t('content', 'Content')} go={go} tiles={[
             { label: t('posts', 'Posts'), count: posts?.cards.length ?? '', tab: 'posts', filter: 'all' },
+            { label: t('ideas', 'Ideas'), tab: 'ideas' },
             { label: t('planned_no_draft', 'Planned, no draft yet'), count: count('planned'), tab: 'posts', filter: 'planned' },
           ]} />
           <Group title={t('this_months_plan', "This month's plan")} go={go} tiles={[

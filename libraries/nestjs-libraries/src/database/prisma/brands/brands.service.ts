@@ -175,5 +175,11 @@ export class BrandsService {
       new Date(Math.max(...times) + 2 * 86400000), []);
     return matchPosts(briefs, posts.map((p) => ({ id: p.id, publishDate: p.publishDate.toISOString() })), taken, tz);
   }
+
+  async pillarsByBrand(orgId: string): Promise<Record<string, string[]>> {
+    const rows = await this._repo.sectionsByKey(orgId, 'pillars');
+    return Object.fromEntries(rows.map((s) => [s.customerId,
+      (Array.isArray(s.rows) ? (s.rows as string[][]) : []).map((r) => (r[0] || '').trim()).filter(Boolean)]));
+  }
 }
 // <<< SANAD-BRANDS

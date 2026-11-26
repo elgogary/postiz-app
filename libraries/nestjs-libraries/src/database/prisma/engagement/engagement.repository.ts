@@ -116,7 +116,8 @@ export class EngagementRepository {
 
   listContentIdeas(orgId: string, limit = 500) {
     return this._prisma.model.contentIdea.findMany({
-      where: { organizationId: orgId, deletedAt: null },
+      // Dropped ideas (Brands hub) are left out of the agents' list.
+      where: { organizationId: orgId, deletedAt: null, status: { not: 'DROPPED' } },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });

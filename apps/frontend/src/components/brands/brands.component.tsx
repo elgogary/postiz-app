@@ -19,11 +19,12 @@ import { BrandPostsTab } from './brand.posts';
 import { BrandStands } from './brand.stands';
 import { BrandCalendar } from './brand.calendar';
 import { BrandMix } from './brand.mix';
+import { IdeasList } from './ideas.list';
 import { usePostEditor } from './post.editor';
 
 const TABS: [string, string][] = [
   ['overview', 'Overview'], ['summary', 'Summary'], ['voice', 'Voice'], ['bench', 'Benchmark'], ['focus', 'Focus'],
-  ['calendar', 'Calendar'], ['mix', 'Content mix'], ['posts', 'Posts'], ['routine', 'Engagement'], ['profile', 'Profile tips'],
+  ['calendar', 'Calendar'], ['mix', 'Content mix'], ['posts', 'Posts'], ['ideas', 'Ideas'], ['routine', 'Engagement'], ['profile', 'Profile tips'],
   ['kpi', 'KPIs'], ['review', 'Before publishing'], ['history', 'Past posts'],
 ];
 const COLORS = ['#3b5bdb', '#0b7285', '#2b8a3e', '#c2255c', '#e67700', '#5f3dc4'];
@@ -152,6 +153,7 @@ export const Brands: FC = () => {
         </BrandMix>
       );
     }
+    if (tab === 'ideas') return <IdeasList key={key} scope={b.id} />;
     if (tab === 'summary') {
       return (
         <div key={key} className="flex flex-col gap-[24px]">
