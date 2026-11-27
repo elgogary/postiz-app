@@ -79,14 +79,15 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     const body: { url: string; username: string; password: string } =
       JSON.parse(Buffer.from(params.code, 'base64').toString());
 
-    console.log(body);
+    // >>> SANAD-BRANDS: check the login against its own lists (a brand-only Listmonk login is refused /api/settings);
+    // the channel is the URL and the login together, so several brands share one Listmonk; no credential goes to the log.
     try {
       const basic = Buffer.from(body.username + ':' + body.password).toString(
         'base64'
       );
 
-      const { data } = await (
-        await this.fetch(body.url + '/api/settings', {
+      await (
+        await this.fetch(body.url + '/api/lists?per_page=1', {
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
@@ -99,15 +100,15 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
         refreshToken: basic,
         expiresIn: dayjs().add(100, 'years').unix() - dayjs().unix(),
         accessToken: basic,
-        id: Buffer.from(body.url).toString('base64'),
-        name: data['app.site_name'],
-        picture: data['app.logo_url'] || '',
-        username: data['app.site_name'],
+        id: Buffer.from(`${body.url}#${body.username}`).toString('base64'),
+        name: body.username,
+        picture: '',
+        username: body.username,
       };
     } catch (e) {
-      console.log(e);
       return 'Invalid credentials';
     }
+    // <<< SANAD-BRANDS
   }
 
   @Tool({ description: 'List of available lists', dataSchema: [] })
