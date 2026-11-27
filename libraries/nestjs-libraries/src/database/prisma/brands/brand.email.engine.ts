@@ -85,7 +85,8 @@ async function ask(tag: string, start: Date): Promise<{ value: RelayReport | nul
     if (!res.ok) throw new Error(`Relay answered ${res.status}`);
     const j = await res.json();
     const ttl = today.getTime() - start.getTime() < 7 * DAY_MS ? RECENT_MS : OLD_MS;
-    if (!(Number(j.requests) > 0)) return { value: null, ttl };
+    // the relay counts an email a few minutes after it is sent: ask again soon
+    if (!(Number(j.requests) > 0)) return { value: null, ttl: FAIL_MS };
     const n = (k: string) => Number(j[k]) || 0;
     return {
       ttl,

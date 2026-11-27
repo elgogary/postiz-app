@@ -26,7 +26,7 @@ const Rows: FC<{ title: string; className?: string; rows: [ReactNode, number | s
   <div className={`${CARD} ${className}`}>
     <h3 className="text-[14px] font-[600] mb-[8px]">{title}</h3>
     {rows.map(([k, v, key]) => (
-      <div key={key} className="flex justify-between gap-[16px] py-[8px] border-t border-fifth first:border-t-0 first:pt-0">
+      <div key={key} className="flex justify-between gap-[16px] py-[8px] text-[14px] border-t border-fifth first:border-t-0 first:pt-0">
         <span className="min-w-0 break-words">{k}</span><b className="font-[600] tabular-nums">{v}</b>
       </div>
     ))}
@@ -120,7 +120,7 @@ export const BrandEmailReport: FC<{ brandId: string; channelId: string; campaign
         <div className={`${CARD} mt-[16px]`}>
           <h3 className="text-[14px] font-[600] mb-[8px]">{t('email_history', 'History')}</h3>
           {rep.history.map((h, i) => (
-            <div key={`${h.step}:${i}`} className="flex justify-between gap-[16px] py-[8px] border-t border-fifth first:border-t-0 first:pt-0">
+            <div key={`${h.step}:${i}`} className="flex justify-between gap-[16px] py-[8px] text-[14px] border-t border-fifth first:border-t-0 first:pt-0">
               <span>{t(STEP[h.step][0], STEP[h.step][1])}{h.by && <> {t('email_by', 'by')} <Text text={h.by} /></>}</span>
               <span className="text-customColor18 text-[13px] whitespace-nowrap">{fmtAt(h.at)}</span>
             </div>

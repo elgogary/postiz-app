@@ -103,12 +103,12 @@ export const BrandEmail: FC<{
                     {STARTED.includes(r.state) ? (
                       <button className="text-start block" onClick={(e) => { e.stopPropagation(); open(r); }}>
                         <span className="block font-[600]"><Text text={r.name} /></span>
-                        <span className="block text-[12px] text-customColor18"><Text text={r.subject} /></span>
+                        {r.subject !== r.name && <span className="block text-[12px] text-customColor18"><Text text={r.subject} /></span>}
                       </button>
                     ) : (
                       <>
                         <span className="block font-[600]"><Text text={r.name} /></span>
-                        <span className="block text-[12px] text-customColor18"><Text text={r.subject} /></span>
+                        {r.subject !== r.name && <span className="block text-[12px] text-customColor18"><Text text={r.subject} /></span>}
                       </>
                     )}
                   </td>

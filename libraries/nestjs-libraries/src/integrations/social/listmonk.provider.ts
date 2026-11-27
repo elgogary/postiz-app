@@ -10,7 +10,6 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { ListmonkDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/listmonk.dto';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
-import slugify from 'slugify';
 // >>> SANAD-BRANDS
 import { hubTag } from '@gitroom/helpers/brands/email.rules';
 // <<< SANAD-BRANDS
@@ -254,11 +253,9 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
           Authorization: `Basic ${auth}`,
         },
         body: JSON.stringify({
-          name: slugify(postDetails[0].settings.subject, {
-            lower: true,
-            strict: true,
-            trim: true,
-          }),
+          // >>> SANAD-BRANDS: the campaign keeps the subject as its name, so the brand's Email tab reads like the inbox
+          name: String(postDetails[0].settings.subject).slice(0, 200),
+          // <<< SANAD-BRANDS
           type: 'regular',
           content_type: 'html',
           subject: postDetails[0].settings.subject,
