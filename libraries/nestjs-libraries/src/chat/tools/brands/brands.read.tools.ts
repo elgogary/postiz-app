@@ -6,7 +6,9 @@ import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.in
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandReviewService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.review.service';
 import { BrandIdeasService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.ideas.service';
-import { BRAND_ARG, STATES, answer, person, pickBrand, plain } from './brands.tool.helpers';
+import { BRAND_ARG, ID, STATES, answer, person, pickBrand, plain } from './brands.tool.helpers';
+
+const BRAND = z.string().max(120).describe(BRAND_ARG);
 
 const READ = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
@@ -46,7 +48,7 @@ export class BrandHubTool implements AgentToolInterface {
       id: 'brand_hub',
       description: `One brand's hub: its summary, voice and focus weeks, the checks an approver confirms, and its posts `
         + `with their state (${STATES}), who sent and who decided, and the last comment.`,
-      inputSchema: z.object({ brand: z.string().describe(BRAND_ARG) }),
+      inputSchema: z.object({ brand: BRAND }),
       mcp: { annotations: { title: 'Brand hub', ...READ } },
       execute: async (input) => answer(async () => {
         const p = person();
@@ -79,7 +81,7 @@ export class PostCommentsTool implements AgentToolInterface {
     return createTool({
       id: 'post_comments',
       description: 'The comments on one post of a brand, oldest first, with who wrote each and the slide it is pinned to.',
-      inputSchema: z.object({ brand: z.string().describe(BRAND_ARG), postId: z.string().describe('The postId from brand_hub') }),
+      inputSchema: z.object({ brand: BRAND, postId: ID.describe('The postId from brand_hub') }),
       mcp: { annotations: { title: 'Post comments', ...READ } },
       execute: async (input) => answer(async () => {
         const p = person();
@@ -101,7 +103,7 @@ export class IdeasListTool implements AgentToolInterface {
       description: 'The idea bank for one brand: each idea with its id, status (NEW, PLANNED, POSTED, DROPPED), hook, '
         + 'angle and points. Only NEW ideas can be drafted.',
       inputSchema: z.object({
-        brand: z.string().describe(BRAND_ARG),
+        brand: BRAND,
         all: z.boolean().optional().describe('Also show planned, posted and dropped ideas (default: new ideas only)'),
       }),
       mcp: { annotations: { title: 'Brand ideas', ...READ } },

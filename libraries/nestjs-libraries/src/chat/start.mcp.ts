@@ -46,7 +46,7 @@ export const startMcp = async (app: INestApplication) => {
 
   const oauthMiddleware = createOAuthMiddleware({
     oauth: {
-      resource: `${process.env.NEXT_PUBLIC_BACKEND_URL}/mcp-oauth`, // SANAD-BRANDS: keeps a path in the backend URL (/api)
+      resource: `${process.env.NEXT_PUBLIC_BACKEND_URL!.replace(/\/$/, '')}/mcp-oauth`, // SANAD-BRANDS: keeps a path in the backend URL (/api)
       authorizationServers: [process.env.NEXT_PUBLIC_BACKEND_URL!],
       validateToken: async (token: string) => {
         const who = await resolveAuth(token);

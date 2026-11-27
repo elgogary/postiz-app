@@ -20,6 +20,7 @@ export const resolveMcpIdentity = async (token: string, deps: McpIdentityDeps): 
   }
   const auth = await deps.byOAuthToken(token);
   if (!auth?.organization || !auth.user?.id) return null;
+  // getOrgsByUserId filters each organisation's `users` to this person, so users[0] is their own membership
   const member = (await deps.orgsOfUser(auth.user.id)).find((o) => o.id === auth.organization.id)?.users?.[0];
   if (!member || member.disabled) return null;
   return { org: auth.organization, user: { id: auth.user.id, role: member.role } };

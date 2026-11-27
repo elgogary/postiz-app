@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { ForbiddenException } from '@nestjs/common';
 import { runWithContext } from '@gitroom/nestjs-libraries/chat/async.storage';
 import { NO_PERSON, pickBrand, plain } from './brands.tool.helpers';
 import { BrandHubTool, BrandsListTool } from './brands.read.tools';
@@ -68,10 +69,20 @@ test('review_post: approve needs both checks confirmed; send back needs a reason
   assert.equal(called('stop').length, 1);
 });
 
-test("a service refusal comes back as the person's message", async () => {
-  const refusing = { ...review, approve: async () => { throw new Error('Only an approver can do this'); } };
-  const out = await asPerson(() => exec(new ReviewPostTool(brands, refusing), { brand: 'b-1', postId: 'p-9', action: 'approve', confirmedOwnCheck: true, confirmedListCheck: true }));
-  assert.deepEqual(out, { error: 'Only an approver can do this' });
+test("a service refusal comes back as the person's message; an internal error never shows its text", async () => {
+  const approveWith = (fail: () => never) => asPerson(() => exec(new ReviewPostTool(brands, { ...review, approve: async () => fail() }),
+    { brand: 'b-1', postId: 'p-9', action: 'approve', confirmedOwnCheck: true, confirmedListCheck: true }));
+  assert.deepEqual(await approveWith(() => { throw new ForbiddenException('Only an approver can do this'); }), { error: 'Only an approver can do this' });
+  const hidden = await approveWith(() => { throw new Error('relation "PostBrief" column x does not exist'); });
+  assert.doesNotMatch(hidden.error, /PostBrief/);
+});
+
+test('a draft that was made but could not be sent for review is still reported with its post', async () => {
+  const failing = { ...review, sendForReview: async () => { throw new ForbiddenException('Add the media first'); } };
+  const out = await asPerson(() => exec(new DraftFromIdeaTool(brands, failing, ideas), { brand: 'b-1', ideaId: 'i-1', date: '2026-12-01' }));
+  assert.equal(out.postId, 'p-9');
+  assert.equal(out.sentForReview, false);
+  assert.match(out.error, /made but not sent for review: Add the media first/);
 });
 
 test('comment_post passes the slide it is pinned to', async () => {
@@ -82,5 +93,6 @@ test('comment_post passes the slide it is pinned to', async () => {
 
 test('helpers: an unknown brand names the ones you have; HTML entities decode once', () => {
   assert.throws(() => pickBrand(BRANDS, 'Moonsab'), /Your brands: Accurate Systems/);
+  assert.throws(() => pickBrand([...BRANDS, { ...BRANDS[0], id: 'b-2' }], 'Accurate Systems'), /2 brands are called .*use the id/);
   assert.equal(plain('<p>a &amp;lt; b</p><ul><li>x</li></ul>'), 'a &lt; b\n- x');
 });
