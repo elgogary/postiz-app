@@ -11,6 +11,10 @@ import { UploadFromUrlTool } from '@gitroom/nestjs-libraries/chat/tools/upload.f
 import { SuggestCommentTool } from '@gitroom/nestjs-libraries/chat/tools/suggest.comment.tool';
 import { AddContentIdeaTool } from '@gitroom/nestjs-libraries/chat/tools/add.content.idea.tool';
 import { ListContentIdeasTool } from '@gitroom/nestjs-libraries/chat/tools/list.content.ideas.tool';
+// >>> SANAD-BRANDS: the Brands hub as the signed-in person
+import { BrandHubTool, BrandsListTool, IdeasListTool, PostCommentsTool } from '@gitroom/nestjs-libraries/chat/tools/brands/brands.read.tools';
+import { CommentPostTool, DraftFromIdeaTool, ReviewPostTool, SendForReviewTool } from '@gitroom/nestjs-libraries/chat/tools/brands/brands.act.tools';
+// <<< SANAD-BRANDS
 
 export const toolList = [
   IntegrationListTool,
@@ -26,4 +30,13 @@ export const toolList = [
   SuggestCommentTool,
   AddContentIdeaTool,
   ListContentIdeasTool,
+  // SANAD-BRANDS
+  BrandsListTool,
+  BrandHubTool,
+  PostCommentsTool,
+  IdeasListTool,
+  DraftFromIdeaTool,
+  SendForReviewTool,
+  CommentPostTool,
+  ReviewPostTool,
 ];
