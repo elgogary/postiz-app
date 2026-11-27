@@ -1,4 +1,4 @@
-import { IsDefined, IsString } from 'class-validator';
+import { IsDefined, IsOptional, IsString } from 'class-validator';
 
 export class TokenExchangeDto {
   @IsString()
@@ -9,11 +9,12 @@ export class TokenExchangeDto {
   @IsDefined()
   code: string;
 
+  // SANAD-BRANDS: optional here, because a client may send them in the Authorization header instead (client_secret_basic)
+  @IsOptional()
   @IsString()
-  @IsDefined()
-  client_id: string;
+  client_id?: string;
 
+  @IsOptional()
   @IsString()
-  @IsDefined()
-  client_secret: string;
+  client_secret?: string;
 }
