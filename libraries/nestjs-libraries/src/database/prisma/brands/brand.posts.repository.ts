@@ -94,6 +94,10 @@ export class BrandPostsRepository {
     return this._prisma.model.postBrief.update({ where: { id }, data });
   }
 
+  deleteBrief(id: string) {
+    return this._prisma.model.postBrief.delete({ where: { id } });
+  }
+
   // Only briefs whose post still exists wait on someone: a post deleted in Postiz leaves its brief behind.
   async waiting(orgId: string) {
     const open = await this._prisma.model.postBrief.findMany({

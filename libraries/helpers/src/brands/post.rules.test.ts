@@ -9,7 +9,7 @@ const NOW = new Date('2026-11-26T10:00:00Z');
 const card = (over: Partial<Card>): Card => ({
   key: 'k', briefId: 'b', postId: 'p', group: 'g', date: '2026-11-28T07:30:00.000Z', state: 'draft', format: 'Text',
   goal: '', pillars: [], title: 'T', sub: '', caption: '', slidesLabel: '', slides: [], visual: '', imagePrompt: '',
-  why: '', verify: '', firstDraft: false, media: [], channel: 'C', sentBy: null, decidedBy: null, comments: 0,
+  why: '', verify: '', firstDraft: false, fromIdea: false, media: [], channel: 'C', sentBy: null, decidedBy: null, comments: 0,
   lastNote: null, ...over,
 });
 
@@ -166,4 +166,25 @@ test('approval block names the first brand whose posts need approval', () => {
   assert.equal(approvalBlock(ch, [{ customerId: 'm', requiresApproval: false }]), 'Acme');
   assert.equal(approvalBlock(ch, [{ customerId: 'm', requiresApproval: false }, { customerId: 'a', requiresApproval: false }]), null);
   assert.equal(approvalBlock([], []), null);
+});
+
+test('un-plan shows on a planned or draft card from an idea, for create and approve only, and never after review', () => {
+  const has = (role: 'view' | 'create' | 'approve', over: Partial<Card>) => actionsFor(role, true, card({ fromIdea: true, ...over }), NOW).includes('unplan');
+  for (const state of ['planned', 'draft'] as const) {
+    assert.equal(has('create', { state }), true);
+    assert.equal(has('approve', { state }), true);
+    assert.equal(has('view', { state }), false);
+  }
+  for (const state of ['review', 'changes', 'scheduled', 'published', 'error'] as const) assert.equal(has('approve', { state }), false);
+  assert.equal(actionsFor('approve', true, card({ state: 'planned', fromIdea: false }), NOW).includes('unplan'), false);
+  assert.equal(actionsFor('approve', true, card({ state: 'draft', fromIdea: false }), NOW).includes('unplan'), false);
+});
+
+test('a card is from an idea only when its brief has an idea', () => {
+  const brief = { id: 'b', postId: null, plannedAt: '2026-11-28T07:30:00.000Z', format: 'Text' as const, goal: '', pillars: [], title: 'T', sub: '',
+    caption: '', slidesLabel: '', slides: [], visual: '', imagePrompt: '', why: '', verify: '', firstDraft: false, review: 'NONE' as const,
+    sentById: null, decidedById: null };
+  assert.equal(buildCards([{ ...brief, ideaId: 'i1' }], [], {})[0].fromIdea, true);
+  assert.equal(buildCards([{ ...brief, ideaId: null }], [], {})[0].fromIdea, false);
+  assert.equal(buildCards([brief], [], {})[0].fromIdea, false);
 });

@@ -43,6 +43,14 @@ export class BrandIdeasRepository {
     return r.count === 1;
   }
 
+  // Un-plan: the idea is New again with no brief, only if it still points at this brief.
+  async release(orgId: string, id: string, briefId: string) {
+    const r = await this._prisma.model.contentIdea.updateMany({
+      where: { id, organizationId: orgId, deletedAt: null, briefId }, data: { status: 'NEW', briefId: null },
+    });
+    return r.count === 1;
+  }
+
   // Drop and Restore change the status only from the one it was read in, and never on a planned idea.
   async moveStatus(orgId: string, id: string, from: string, to: string) {
     const r = await this._prisma.model.contentIdea.updateMany({

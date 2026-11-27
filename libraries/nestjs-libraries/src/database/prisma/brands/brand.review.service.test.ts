@@ -35,6 +35,7 @@ function setup(opts: {
     addComment: async (o: string, p: string, u: string, text: string) => { calls.push(['addComment', p, u, text]); return { id: 'cm1' }; },
     comments: async () => [{ id: 'cm1', content: 'Fix slide 2', userId: 'u2', createdAt: new Date() }],
     names: async () => ({ u2: 'Owner' }),
+    deleteBrief: async (id: string) => { calls.push(['deleteBrief', id]); return {}; },
   };
   const posts = {
     changePostStatus: async (...a: unknown[]) => { calls.push(['changePostStatus', ...a]); return {}; },
@@ -42,8 +43,10 @@ function setup(opts: {
     changeState: async (...a: unknown[]) => { calls.push(['changeState', ...a]); return {}; },
     mapTypeToPost: async (body: unknown) => body,
     createPost: async () => [{ postId: 'pNew', integration: 'i1' }],
+    deletePost: async (...a: unknown[]) => { calls.push(['deletePost', ...a]); return {}; },
   };
-  return { svc: new BrandReviewService(brands as never, repo as never, posts as never), calls };
+  const ideas = { release: async (...a: unknown[]) => { calls.push(['release', ...a]); return true; } };
+  return { svc: new BrandReviewService(brands as never, repo as never, posts as never, ideas as never), calls };
 }
 
 const args = ['o', 'u1', 'USER', 'c1'] as const;
@@ -123,4 +126,28 @@ test('a new date must be in the future and only for a post not yet scheduled', a
 test('a published poll is not marked published again', async () => {
   const { svc } = setup({ role: 'approve', state: 'PUBLISHED', brief: { format: 'Poll' } });
   await assert.rejects(svc.markPublished(...args, 'p1'), (e) => e instanceof BadRequestException && /already published/.test(e.message));
+});
+
+test('un-plan deletes the draft, releases the idea and deletes the brief, last', async () => {
+  const { svc, calls } = setup({ role: 'create', brief: { ideaId: 'i9' } });
+  assert.deepEqual(await svc.unplan(...args, 'b1'), { ok: true });
+  assert.deepEqual(calls, [['deletePost', 'o', 'g1'], ['release', 'o', 'i9', 'b1'], ['deleteBrief', 'b1']]);
+});
+
+test('un-plan of a planned post with no draft only releases the idea and deletes the brief', async () => {
+  const { svc, calls } = setup({ role: 'approve', brief: { ideaId: 'i9', postId: null } });
+  await svc.unplan(...args, 'b1');
+  assert.deepEqual(calls, [['release', 'o', 'i9', 'b1'], ['deleteBrief', 'b1']]);
+});
+
+test('un-plan is refused: viewer, plan-imported brief, sent for review, scheduled post, unknown brief', async () => {
+  await assert.rejects(setup({ role: 'view', brief: { ideaId: 'i9' } }).svc.unplan(...args, 'b1'), ForbiddenException);
+  await assert.rejects(setup({ role: 'create', brief: { ideaId: null, planRef: '2026#1' } }).svc.unplan(...args, 'b1'), (e) => e instanceof BadRequestException && /idea/.test(e.message));
+  for (const review of ['IN_REVIEW', 'SENT_BACK', 'APPROVED']) {
+    const s = setup({ role: 'create', brief: { ideaId: 'i9', review } });
+    await assert.rejects(s.svc.unplan(...args, 'b1'), (e) => e instanceof BadRequestException && /review/.test(e.message));
+    assert.deepEqual(s.calls, []);
+  }
+  await assert.rejects(setup({ role: 'create', state: 'QUEUE', brief: { ideaId: 'i9' } }).svc.unplan(...args, 'b1'), BadRequestException);
+  await assert.rejects(setup({ role: 'create', brief: null }).svc.unplan(...args, 'b1'), NotFoundException);
 });

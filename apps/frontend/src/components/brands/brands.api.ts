@@ -71,6 +71,7 @@ export const useBrandsApi = () => {
     posts: (id: string) => send(`/brands/${id}/posts`) as Promise<BrandPosts>,
     createDraft: (id: string, briefId: string, date: string) => send(`/brands/${id}/briefs/${briefId}/draft`, 'POST', { date }) as Promise<{ postId: string }>,
     briefDate: (id: string, briefId: string, date: string) => send(`/brands/${id}/briefs/${briefId}/date`, 'PUT', { date }),
+    unplan: (id: string, briefId: string) => send(`/brands/${id}/briefs/${briefId}/unplan`, 'POST', {}),
     review: (id: string, postId: string) => send(`/brands/${id}/posts/${postId}/review`, 'POST', {}),
     approve: (id: string, postId: string, own: boolean, list: boolean) => send(`/brands/${id}/posts/${postId}/approve`, 'POST', { own, list }),
     sendBack: (id: string, postId: string, reason: string) => send(`/brands/${id}/posts/${postId}/send-back`, 'POST', { reason }),

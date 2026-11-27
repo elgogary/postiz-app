@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { PostBrief } from '@prisma/client';
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandPostsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.posts.repository';
+import { BrandIdeasRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.ideas.repository';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { BrandRole, OrgRole, canApprove, canEdit } from '@gitroom/helpers/brands/brand.rules';
 import {
@@ -29,6 +30,7 @@ const asBrief = (b: PostBrief): BriefRow => ({
   pillars: b.pillars, title: b.title, sub: b.sub, caption: b.caption, slidesLabel: b.slidesLabel,
   slides: Array.isArray(b.slides) ? (b.slides as string[]) : [], visual: b.visual, imagePrompt: b.imagePrompt, why: b.why,
   verify: b.verify, firstDraft: b.firstDraft, review: b.review as ReviewState, sentById: b.sentById, decidedById: b.decidedById,
+  ideaId: b.ideaId,
 });
 
 const pinsOf = (b: PostBrief | null): Record<string, number> =>
@@ -36,7 +38,8 @@ const pinsOf = (b: PostBrief | null): Record<string, number> =>
 
 @Injectable()
 export class BrandReviewService {
-  constructor(private _brands: BrandsService, private _repo: BrandPostsRepository, private _posts: PostsService) {}
+  constructor(private _brands: BrandsService, private _repo: BrandPostsRepository, private _posts: PostsService,
+    private _ideas: BrandIdeasRepository) {}
 
   async cards(orgId: string, userId: string, orgRole: OrgRole, customerId: string) {
     const ctx = await this._brands.context(orgId, userId, orgRole, customerId);
@@ -200,6 +203,23 @@ export class BrandReviewService {
       postId: made.postId, review: 'NONE', sentById: null, sentAt: null, decidedById: null, decidedAt: null, ownCheckedBy: null, listCheckedBy: null,
     });
     return { postId: made.postId as string };
+  }
+
+  // Un-plan: a post planned from an idea and not yet sent for review goes back to the idea as New. Each step can be
+  // run again after a failure: the post first, then the idea, the brief last.
+  async unplan(orgId: string, userId: string, orgRole: OrgRole, customerId: string, briefId: string) {
+    const ctx = await this._brands.context(orgId, userId, orgRole, customerId);
+    this.mustCreate(ctx.role);
+    const brief = await this._repo.brief(orgId, customerId, briefId);
+    if (!brief) throw new NotFoundException('Planned post not found');
+    if (!brief.ideaId) throw new BadRequestException('Only a post planned from an idea can be un-planned');
+    if (brief.review !== 'NONE') throw new BadRequestException('This post was already sent for review: stop it first');
+    const post = brief.postId ? await this._repo.post(orgId, ctx.channels.map((c) => c.id), brief.postId) : null;
+    if (post && post.state !== 'DRAFT') throw new BadRequestException('Only a planned or draft post can be un-planned');
+    if (post) await this._posts.deletePost(orgId, post.group);
+    await this._ideas.release(orgId, brief.ideaId, brief.id);
+    await this._repo.deleteBrief(brief.id);
+    return { ok: true };
   }
 
   async markPublished(orgId: string, userId: string, orgRole: OrgRole, customerId: string, postId: string) {
