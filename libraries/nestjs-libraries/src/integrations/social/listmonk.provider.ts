@@ -47,6 +47,20 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
         validation: `/^.{3,}$/`,
         type: 'password' as const,
       },
+      // >>> SANAD-BRANDS: each brand sends from its own verified address, and replies can go to a real inbox
+      {
+        key: 'from',
+        label: 'Sender, e.g. Brand <hello@brand.com> (empty: Listmonk default)',
+        validation: `/^(|[^<>]*<[^@\\s<>]+@[^@\\s<>]+>|[^@\\s<>]+@[^@\\s<>]+)$/`,
+        type: 'text' as const,
+      },
+      {
+        key: 'replyTo',
+        label: 'Reply-to address (optional)',
+        validation: `/^(|[^@\\s<>]+@[^@\\s<>]+)$/`,
+        type: 'text' as const,
+      },
+      // <<< SANAD-BRANDS
     ];
   }
 
@@ -174,7 +188,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     postDetails: PostDetails<ListmonkDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
-    const body: { url: string; username: string; password: string } =
+    const body: { url: string; username: string; password: string; from?: string; replyTo?: string } =
       JSON.parse(
         AuthService.fixedDecryption(integration.customInstanceDetails!)
       );
@@ -250,6 +264,11 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
           ...(+postDetails?.[0]?.settings?.template
             ? { template_id: +postDetails[0].settings.template }
             : {}),
+          // >>> SANAD-BRANDS: the brand's own sender and reply-to, set on its channel (re-checked here: the form's checks
+          // run in the browser only, and a line break would add mail headers)
+          ...(body.from && /^[^\r\n]{3,200}$/.test(body.from) ? { from_email: body.from } : {}),
+          ...(body.replyTo && /^[^@\s<>]+@[^@\s<>]+$/.test(body.replyTo) ? { headers: [{ 'Reply-To': body.replyTo }] } : {}),
+          // <<< SANAD-BRANDS
         }),
       })
     ).json();
