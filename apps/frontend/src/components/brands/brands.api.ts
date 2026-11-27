@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import type { BrandRole } from '@gitroom/helpers/brands/brand.rules';
 import type { Card } from '@gitroom/helpers/brands/post.rules';
 import type { IdeaView } from '@gitroom/helpers/brands/idea.rules';
+import type { EmailContacts, EmailOverview, EmailReport } from '@gitroom/helpers/brands/email.rules';
 
 export interface Channel { id: string; name: string; provider: string; picture: string | null }
 export interface BrandSummary { id: string; name: string; channels: Channel[]; role: BrandRole; requiresApproval: boolean; waiting: number }
@@ -59,6 +60,16 @@ export const useBrandsApi = () => {
     }
     return data;
   }, [fetch]);
+  // A file goes as multipart: customFetch leaves the content type to the browser when the body is FormData.
+  const upload = useCallback(async (path: string, form: FormData) => {
+    const res = await fetch(path, { method: 'POST', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = (data as { message?: string })?.message;
+      throw new BrandsApiError(msg || String(res.status), res.status, !!msg);
+    }
+    return data;
+  }, [fetch]);
   return useMemo(() => ({
     list: () => send('/brands') as Promise<BrandSummary[]>,
     get: (id: string) => send(`/brands/${id}`) as Promise<BrandDetail>,
@@ -89,6 +100,19 @@ export const useBrandsApi = () => {
     planIdea: (id: string, body: { customerId: string; date: string; format: string; ai: boolean }) =>
       send(`/brand-ideas/${id}/plan`, 'POST', body) as Promise<{ briefId: string; firstDraft: boolean; aiFailed: boolean; noChannel: boolean }>,
     refineIdea: (idea: string) => send('/engagement/content-ideas/refine', 'POST', { idea }) as Promise<{ refined: string }>,
-  }), [send]);
+    email: (id: string) => send(`/brands/${id}/email`) as Promise<EmailOverview>,
+    emailReport: (id: string, channelId: string, campaignId: number) =>
+      send(`/brands/${id}/email/${channelId}/campaigns/${campaignId}`) as Promise<EmailReport>,
+    emailPreview: (id: string, channelId: string, campaignId: number) =>
+      send(`/brands/${id}/email/${channelId}/campaigns/${campaignId}/preview`) as Promise<{ html: string }>,
+    emailContacts: (id: string, channelId: string, listId: number, page: number) =>
+      send(`/brands/${id}/email/${channelId}/lists/${listId}/contacts?page=${page}`) as Promise<EmailContacts>,
+    emailImport: (id: string, channelId: string, listId: number, file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('agreed', 'true');
+      return upload(`/brands/${id}/email/${channelId}/lists/${listId}/import`, form) as Promise<{ processed: number; skipped: number }>;
+    },
+  }), [send, upload]);
 };
 // <<< SANAD-BRANDS

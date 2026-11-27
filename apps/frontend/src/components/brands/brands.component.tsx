@@ -16,6 +16,7 @@ import { BrandFocus } from './brand.focus';
 import { BrandAccessModal } from './brand.access.modal';
 import { BrandImportModal } from './brand.import.modal';
 import { BrandPostsTab } from './brand.posts';
+import { BrandEmail } from './brand.email';
 import { BrandStands } from './brand.stands';
 import { BrandCalendar } from './brand.calendar';
 import { BrandMix } from './brand.mix';
@@ -25,7 +26,7 @@ import { usePostEditor } from './post.editor';
 const TABS: [string, string][] = [
   ['overview', 'Overview'], ['summary', 'Summary'], ['voice', 'Voice'], ['bench', 'Benchmark'], ['focus', 'Focus'],
   ['calendar', 'Calendar'], ['mix', 'Content mix'], ['posts', 'Posts'], ['ideas', 'Ideas'], ['routine', 'Engagement'], ['profile', 'Profile tips'],
-  ['kpi', 'KPIs'], ['review', 'Before publishing'], ['history', 'Past posts'],
+  ['kpi', 'KPIs'], ['review', 'Before publishing'], ['history', 'Past posts'], ['email', 'Email'],
 ];
 const COLORS = ['#3b5bdb', '#0b7285', '#2b8a3e', '#c2255c', '#e67700', '#5f3dc4'];
 const initials = (name: string) => name.split(/\s+/).filter((w) => /\p{L}/u.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -113,6 +114,7 @@ export const Brands: FC = () => {
   const toGo = (tab: string, f?: string) => go({ tab, filter: f });
   const saveText = (id: string, key: string) => async (html: string) => { await api.saveText(id, key, html); await load(); };
   const saveRows = (id: string, key: string) => async (rows: string[][]) => { await api.saveRows(id, key, rows); await load(); };
+  const hasEmail = !!ready?.channels.some((c) => c.provider === 'listmonk');
   const label = (k: string) => t(k, TABS.find(([key]) => key === k)?.[1] || k);
 
   const body = () => {
@@ -152,6 +154,9 @@ export const Brands: FC = () => {
           <BrandTextSection key={`${key}:text`} label={t('suggested_posting_times', 'Suggested posting times (from the plan)')} data={b.sections.mix} canEdit={may} onSave={saveText(b.id, 'mix')} />
         </BrandMix>
       );
+    }
+    if (tab === 'email' && hasEmail) {
+      return <BrandEmail key={key} brandId={b.id} brandName={b.name} role={b.role} posts={posts} filter={filter} focus={focus} go={go} />;
     }
     if (tab === 'ideas') return <IdeasList key={key} scope={b.id} onPlanned={load} />;
     if (tab === 'summary') {
@@ -208,7 +213,7 @@ export const Brands: FC = () => {
           </div>
         )}
         <div role="tablist" className="flex gap-[16px] border-b border-fifth overflow-x-auto">
-          {TABS.map(([k, l]) => (
+          {TABS.filter(([k]) => k !== 'email' || hasEmail).map(([k, l]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => go({ tab: k })}
               className={`shrink-0 whitespace-nowrap py-[8px] text-[14px] border-b-2 [@media(max-width:480px)]:min-h-[44px] [@media(max-width:480px)]:min-w-[44px] ${tab === k ? 'border-[#612BD3] text-[#5221b8] dark:text-[#c4b5fd] font-[600]' : 'border-transparent'}`}>
               {t(k, l)}

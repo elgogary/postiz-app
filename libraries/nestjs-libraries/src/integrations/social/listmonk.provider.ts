@@ -10,7 +10,9 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { ListmonkDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/listmonk.dto';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
-import slugify from 'slugify';
+// >>> SANAD-BRANDS
+import { hubTag } from '@gitroom/helpers/brands/email.rules';
+// <<< SANAD-BRANDS
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 
 export class ListmonkProvider extends SocialAbstract implements SocialProvider {
@@ -251,11 +253,9 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
           Authorization: `Basic ${auth}`,
         },
         body: JSON.stringify({
-          name: slugify(postDetails[0].settings.subject, {
-            lower: true,
-            strict: true,
-            trim: true,
-          }),
+          // >>> SANAD-BRANDS: the campaign keeps the subject as its name, so the brand's Email tab reads like the inbox
+          name: String(postDetails[0].settings.subject).slice(0, 200),
+          // <<< SANAD-BRANDS
           type: 'regular',
           content_type: 'html',
           subject: postDetails[0].settings.subject,
@@ -267,7 +267,11 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
           // >>> SANAD-BRANDS: the brand's own sender and reply-to, set on its channel (re-checked here: the form's checks
           // run in the browser only, and a line break would add mail headers)
           ...(body.from && /^[^\r\n]{3,200}$/.test(body.from) ? { from_email: body.from } : {}),
-          ...(body.replyTo && /^[^@\s<>]+@[^@\s<>]+$/.test(body.replyTo) ? { headers: [{ 'Reply-To': body.replyTo }] } : {}),
+          // every email carries the Hub's tag (the post id) so the sending relay's report can be read per email
+          headers: [
+            ...(body.replyTo && /^[^@\s<>]+@[^@\s<>]+$/.test(body.replyTo) ? [{ 'Reply-To': body.replyTo }] : []),
+            { 'X-Mailin-Tag': hubTag(postDetails[0].id) },
+          ],
           // <<< SANAD-BRANDS
         }),
       })
