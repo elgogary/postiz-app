@@ -206,7 +206,7 @@ export function parsePlan(page: string): ParsedPlan {
   const [checks, rules] = review.includes('</ol>') ? [review.split('</ol>')[0], review.split('</ol>').slice(1).join('</ol>')] : [review, ''];
   const bench = tab('bench'), kpi = tab('kpi'), history = tab('history');
   return {
-    sections: { summary: tab('overview'), voice: tab('voice') + rules.trim(), routine: tab('routine'), profile: tab('profile'), mix: tab('mix') },
+    sections: { summary: tab('overview'), voice: (tab('voice') || tab('guide')) + rules.trim(), routine: tab('routine'), profile: tab('profile'), mix: tab('mix') },
     rows: {
       pillars: [...new Set(raw.flatMap(postPillars))].map((p) => [p]),
       bench: tableRows(bench).map(benchRow),
