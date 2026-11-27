@@ -37,6 +37,7 @@ function setup(opts: Opts = {}) {
   const brands = { context: async () => ({ customer: { id: 'acc', name: 'Acme' }, role: opts.role || 'approve', channels: [] }) };
   const repo = {
     emailChannels: async () => channels,
+    history: async () => [],
     postsByRelease: async (_o: string, _i: string, urls: string[]) =>
       opts.post ? urls.filter((u) => u.endsWith('/campaigns/1/preview')).map((u) => ({ id: 'p1', releaseURL: u })) : [],
     briefsByPost: async () => (opts.brief ? [{ postId: 'p1', ...opts.brief }] : []),

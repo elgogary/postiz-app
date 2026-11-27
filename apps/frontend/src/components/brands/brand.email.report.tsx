@@ -12,6 +12,7 @@ import { CARD, EmailGo, fmtAt, pctText, QUIET, Retry, Skeleton, StateChip, Text 
 const STEP: Record<HistoryStep, [string, string]> = {
   sent_for_review: ['email_step_review', 'Sent for review'], approved: ['email_step_approved', 'Approved'],
   sent: ['email_step_sent', 'Sent'], finished: ['email_step_finished', 'Finished'],
+  sent_before_hub: ['email_step_before_hub', 'Sent from Brevo, before the Hub'],
 };
 
 const Stat: FC<{ label: string; r: Rate | null; note: ReactNode }> = ({ label, r, note }) => (

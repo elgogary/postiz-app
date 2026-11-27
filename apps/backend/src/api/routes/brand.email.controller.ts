@@ -30,6 +30,12 @@ export class BrandEmailController {
     return this._email.overview(org.id, user.id, orgRoleOf(org), customerId);
   }
 
+  @Post('/:customerId/email/history')
+  importHistory(@GetOrgFromRequest() org: Organization, @GetUserFromRequest() user: User, @Param('customerId') customerId: string,
+    @Body() body: { campaignIds?: unknown; listMap?: unknown }) {
+    return this._email.importHistory(org.id, user.id, orgRoleOf(org), customerId, body?.campaignIds, body?.listMap);
+  }
+
   @Get('/:customerId/email/:channelId/campaigns/:id')
   report(@GetOrgFromRequest() org: Organization, @GetUserFromRequest() user: User, @Param('customerId') customerId: string,
     @Param('channelId') channelId: string, @Param('id', ParseIntPipe) id: number) {

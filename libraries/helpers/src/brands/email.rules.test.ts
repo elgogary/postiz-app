@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  IMPORT_MAX_ROWS, campaignIdFromRelease, campaignState, consentOf, hubTag, listmonkImportCsv, parseCsv, pct, rate, readContacts,
-  unsubscribesByCampaign,
+  HISTORY_CHANNEL, IMPORT_MAX_ROWS, campaignIdFromRelease, campaignState, consentOf, hubTag, listmonkImportCsv, parseCsv, pct, rate, readContacts,
+  sourceOf, unsubscribesByCampaign,
 } from './email.rules';
 
 test('rates are rounded to two places and need a base above zero', () => {
@@ -84,4 +84,12 @@ test('the Listmonk import file carries who confirmed the agreement on every pers
   assert.deepEqual(rows[1].slice(0, 2), ['a@x.com', 'Ali "A"']);
   assert.equal(rows[2][1], 'b');
   assert.deepEqual(JSON.parse(rows[1][2]), { consent: { by: 'Mona', byId: 'u-1', at: '2026-11-27T10:00:00Z', source: 'hub-import' } });
+});
+
+test('a list brought over from Brevo is told by its tag; the history channel has its own id', () => {
+  assert.equal(sourceOf(['consent-agreed', 'from-brevo']), 'brevo');
+  assert.equal(sourceOf(['consent-agreed']), null);
+  assert.equal(sourceOf(undefined), null);
+  assert.equal(consentOf(['from-brevo']), 'none');
+  assert.equal(HISTORY_CHANNEL, 'history');
 });

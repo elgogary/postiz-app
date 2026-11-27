@@ -14,6 +14,7 @@ export interface EmailCampaignRow {
 }
 export interface EmailListRow {
   channelId: string; id: number; name: string; contacts: number; unsubscribed: number; consent: ConsentKind; lastEmail: string | null;
+  source: 'brevo' | null; // lists brought over from Brevo carry the tag from-brevo
 }
 export interface EmailOverview {
   channels: { id: string; name: string }[];
@@ -22,7 +23,11 @@ export interface EmailOverview {
   lists: EmailListRow[];
   failed: string[]; // channel names whose Listmonk could not be read
 }
-export type HistoryStep = 'sent_for_review' | 'approved' | 'sent' | 'finished';
+export type HistoryStep = 'sent_for_review' | 'approved' | 'sent' | 'finished' | 'sent_before_hub';
+// The channelId of campaigns sent before the Hub, kept in the Hub's own table (BrandEmailHistory).
+export const HISTORY_CHANNEL = 'history';
+export const FROM_BREVO_TAG = 'from-brevo';
+export const sourceOf = (tags: string[] | null | undefined): 'brevo' | null => (tags?.includes(FROM_BREVO_TAG) ? 'brevo' : null);
 export interface EmailReport {
   row: EmailCampaignRow;
   from: string;
