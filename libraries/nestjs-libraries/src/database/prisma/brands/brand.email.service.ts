@@ -6,11 +6,12 @@ import { BrandEmailRepository } from '@gitroom/nestjs-libraries/database/prisma/
 import { Login, RelayReport, lmFetch, lmJson, lmPreview, relayOn, relayReport, why } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.engine';
 import { LmCampaign, LmList, clearLoadCache, loadChannel } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.load';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
-import { OrgRole } from '@gitroom/helpers/brands/brand.rules';
+import { OrgRole, isOrgAdmin } from '@gitroom/helpers/brands/brand.rules';
 import {
   EmailCampaignRow, EmailContacts, EmailListRow, EmailOverview, EmailReport, HistoryStep, campaignIdFromRelease, campaignState,
-  consentOf, hubTag, listmonkImportCsv, rate, readContacts,
+  HISTORY_CHANNEL, consentOf, hubTag, listmonkImportCsv, rate, readContacts, sourceOf,
 } from '@gitroom/helpers/brands/email.rules';
+import { HistoryInput, checkImportBody, historyCampaignRow, historyReport, readBrevoCampaign } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.history';
 
 type Channel = { id: string; name: string; customInstanceDetails: string | null };
 type Relay = { postId: string; report: RelayReport | null };
@@ -86,6 +87,10 @@ export class BrandEmailService {
   async overview(orgId: string, userId: string, orgRole: OrgRole, customerId: string): Promise<EmailOverview> {
     await this._brands.context(orgId, userId, orgRole, customerId);
     const channels = await this._repo.emailChannels(orgId, customerId);
+    const history = await this._repo.history(orgId, customerId).catch((e) => {
+      this._log.warn(`Earlier campaigns not read: ${why(e)}`);
+      return [];
+    });
     const done = await Promise.all(channels.map(async (ch) => {
       try {
         const login = this.open(ch);
@@ -97,7 +102,9 @@ export class BrandEmailService {
           const used = data.campaigns.filter((k) => k.started_at && (k.lists || []).some((y) => y.id === x.id)).map((k) => k.started_at as string);
           return {
             channelId: ch.id, id: x.id, name: x.name, contacts: Math.max(0, (x.subscriber_count || 0) - unsub), unsubscribed: unsub,
-            consent: consentOf(x.tags), lastEmail: used.sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null,
+            consent: consentOf(x.tags), source: sourceOf(x.tags),
+            lastEmail: used.concat(history.filter((h) => h.listIds.includes(x.id)).map((h) => h.sentAt.toISOString()))
+              .sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null,
           };
         });
         return { ch, campaigns, lists, ok: true };
@@ -109,7 +116,7 @@ export class BrandEmailService {
     return {
       channels: channels.map((c) => ({ id: c.id, name: c.name })),
       relay: relayOn() ? 'brevo' : null,
-      campaigns: done.flatMap((d) => d.campaigns).sort((a, b) => Date.parse(b.at || '') - Date.parse(a.at || '')),
+      campaigns: done.flatMap((d) => d.campaigns).concat(history.map(historyCampaignRow)).sort((a, b) => Date.parse(b.at || '') - Date.parse(a.at || '')),
       lists: done.flatMap((d) => d.lists),
       failed: done.filter((d) => !d.ok).map((d) => d.ch.name),
     };
@@ -117,6 +124,7 @@ export class BrandEmailService {
 
   async report(orgId: string, userId: string, orgRole: OrgRole, customerId: string, channelId: string, id: number): Promise<EmailReport> {
     await this._brands.context(orgId, userId, orgRole, customerId);
+    if (channelId === HISTORY_CHANNEL) return historyReport(await this.historyRow(orgId, customerId, id));
     const { ch, login } = await this.channel(orgId, customerId, channelId);
     return this.engine(async () => {
       const data = await loadChannel(ch.id, login);
@@ -152,11 +160,46 @@ export class BrandEmailService {
 
   async preview(orgId: string, userId: string, orgRole: OrgRole, customerId: string, channelId: string, id: number) {
     await this._brands.context(orgId, userId, orgRole, customerId);
+    if (channelId === HISTORY_CHANNEL) return { html: (await this.historyRow(orgId, customerId, id)).html || '' };
     const { ch, login } = await this.channel(orgId, customerId, channelId);
     return this.engine(async () => {
       if (!(await loadChannel(ch.id, login)).campaigns.some((x) => x.id === id)) throw new NotFoundException('Campaign not found');
       return { html: await lmPreview(login, id) };
     });
+  }
+
+  private async historyRow(orgId: string, customerId: string, id: number) {
+    const h = await this._repo.historyOne(orgId, customerId, String(id));
+    if (!h) throw new NotFoundException('Campaign not found');
+    return h;
+  }
+
+  // One-time move of a brand's Brevo campaigns into the Hub (org admin). Every campaign is read before any is stored.
+  async importHistory(orgId: string, userId: string, orgRole: OrgRole, customerId: string, campaignIds: unknown, listMap: unknown) {
+    await this._brands.context(orgId, userId, orgRole, customerId);
+    if (!isOrgAdmin(orgRole)) throw new ForbiddenException('Only an admin can bring over earlier campaigns');
+    // the relay key belongs to one account: only the organization that owns it may read its campaigns
+    const owner = process.env.BREVO_ORG_ID && process.env.BREVO_ORG_ID.length > 0 ? process.env.BREVO_ORG_ID : null;
+    if (owner !== orgId) throw new ForbiddenException('The sending relay account on this server belongs to another organization');
+    const { ids, map } = checkImportBody(campaignIds, listMap);
+    const own = new Set<number>();
+    for (const ch of await this._repo.emailChannels(orgId, customerId)) {
+      clearLoadCache(ch.id);
+      try { (await loadChannel(ch.id, this.open(ch))).lists.forEach((x) => own.add(x.id)); } catch (e) {
+        if (e instanceof HttpException) throw e;
+        this._log.warn(`Lists of a channel not read: ${why(e)}`);
+        throw new HttpException(DOWN, 502);
+      }
+    }
+    const names = new Map<number, string>();
+    const rows: HistoryInput[] = [];
+    for (const id of ids) rows.push(await readBrevoCampaign(id, map, own, names));
+    for (const r of rows) {
+      const had = await this._repo.historyAnyBrand(orgId, r.sourceId);
+      if (had && had.customerId !== customerId) throw new BadRequestException(`Campaign ${r.sourceId} was already brought over for another brand`);
+    }
+    for (const r of rows) await this._repo.saveHistory(orgId, customerId, userId, r);
+    return { imported: rows.length, campaigns: rows.map((r) => ({ id: Number(r.sourceId), name: r.name })) };
   }
 
   private async approverList(orgId: string, userId: string, orgRole: OrgRole, customerId: string, channelId: string, listId: number) {

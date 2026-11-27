@@ -1,5 +1,5 @@
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { SocialAbstract } from '../social.abstract';
+import { BadBody, SocialAbstract } from '../social.abstract';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -11,7 +11,7 @@ import { Integration } from '@prisma/client';
 import { ListmonkDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/listmonk.dto';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 // >>> SANAD-BRANDS
-import { hubTag } from '@gitroom/helpers/brands/email.rules';
+import { consentOf, hubTag } from '@gitroom/helpers/brands/email.rules';
 // <<< SANAD-BRANDS
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 
@@ -151,7 +151,11 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
       })
     ).json();
 
-    return postTypes.data.results.map((p: any) => ({ id: p.id, name: p.name }));
+    // >>> SANAD-BRANDS: a list with no recorded agreement is not offered for a campaign
+    return postTypes.data.results
+      .filter((p: any) => consentOf(p.tags) !== 'none')
+      .map((p: any) => ({ id: p.id, name: p.name }));
+    // <<< SANAD-BRANDS
   }
 
   @Tool({ description: 'List of available templates', dataSchema: [] })
@@ -241,6 +245,18 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     ${postDetails[0].message}
   </div>
 `;
+
+    // >>> SANAD-BRANDS: refuse a send to a list with no recorded agreement (the list is read again here, not trusted from the form)
+    const target = await (
+      await this.fetch(`${body.url}/api/lists/${+postDetails[0].settings.list}`, {
+        headers: { Accept: 'application/json', Authorization: `Basic ${auth}` },
+      })
+    ).json();
+    if (consentOf(target?.data?.tags) === 'none') {
+      throw new BadBody('listmonk', JSON.stringify({ list: postDetails[0].settings.list }), '',
+        'This list has no recorded agreement to hear from the brand, so nothing was sent');
+    }
+    // <<< SANAD-BRANDS
 
     const {
       data: { uuid: postId, id: campaignId },

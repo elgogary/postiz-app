@@ -61,6 +61,7 @@ export const BrandEmailLists: FC<{
                       {approver
                         ? <button className="text-start font-[600]" onClick={(e) => { e.stopPropagation(); go1(); }}><Text text={l.name} /></button>
                         : <span className="font-[600]"><Text text={l.name} /></span>}
+                      {l.source === 'brevo' && <div className="text-[12px] text-customColor18">{t('email_from_brevo', 'From Brevo')}</div>}
                     </td>
                     <td className={`${TD} ${NUM}`}>{l.contacts}</td>
                     <td className={`${TD} ${NUM}`}>{l.unsubscribed}</td>

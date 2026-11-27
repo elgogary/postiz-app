@@ -1,10 +1,12 @@
 // >>> SANAD-BRANDS: reads for a brand's Email tab. Every query is scoped by orgId.
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { HistoryInput } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.history';
 
 @Injectable()
 export class BrandEmailRepository {
-  constructor(private _prisma: PrismaRepository<'integration' | 'post' | 'postBrief' | 'user'>) {}
+  constructor(private _prisma: PrismaRepository<'integration' | 'post' | 'postBrief' | 'user' | 'brandEmailHistory'>) {}
 
   emailChannels(orgId: string, customerId: string) {
     return this._prisma.model.integration.findMany({
@@ -35,6 +37,35 @@ export class BrandEmailRepository {
     const rows = await this._prisma.model.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, email: true } });
     for (const u of rows) out.set(u.id, u.name || u.email);
     return out;
+  }
+
+  // the campaigns list needs no email body or link counts
+  history(orgId: string, customerId: string) {
+    return this._prisma.model.brandEmailHistory.findMany({
+      where: { orgId, customerId }, orderBy: { sentAt: 'desc' },
+      select: {
+        sourceId: true, name: true, subject: true, sentAt: true, listIds: true, sent: true, delivered: true, opens: true,
+        clicks: true, unsubscribed: true,
+      },
+    });
+  }
+
+  historyAnyBrand(orgId: string, sourceId: string) {
+    return this._prisma.model.brandEmailHistory.findFirst({ where: { orgId, source: 'brevo', sourceId }, select: { customerId: true } });
+  }
+
+  historyOne(orgId: string, customerId: string, sourceId: string) {
+    return this._prisma.model.brandEmailHistory.findFirst({ where: { orgId, customerId, source: 'brevo', sourceId } });
+  }
+
+  // Idempotent: the same Brevo campaign for the same org updates its row (counts frozen at the latest import).
+  saveHistory(orgId: string, customerId: string, importedById: string, h: HistoryInput) {
+    const data = { ...h, links: h.links as Prisma.InputJsonValue, customerId };
+    return this._prisma.model.brandEmailHistory.upsert({
+      where: { orgId_source_sourceId: { orgId, source: 'brevo', sourceId: h.sourceId } },
+      create: { ...data, orgId, source: 'brevo', importedById },
+      update: data,
+    });
   }
 }
 // <<< SANAD-BRANDS
