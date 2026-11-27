@@ -2,6 +2,7 @@
 // >>> SANAD-BRANDS: one post card (prototype postCard): top line, media, who and when, the two ticks, actions,
 // new date and send-back forms, the brief, comments. Locks come from post.rules so the UI and the backend agree.
 import { FC, useState } from 'react';
+import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import type { BrandRole } from '@gitroom/helpers/brands/brand.rules';
@@ -64,11 +65,18 @@ export const BrandPostCard: FC<{
     stop: () => run(() => api.stop(brandId, c.postId!), t('stopped_back_to_draft', 'Stopped: back to Draft')),
     newDate: () => setForm('date'),
     markPublished: () => run(() => api.published(brandId, c.postId!), t('marked_published', 'Marked published')),
+    unplan: async () => {
+      const ok = await deleteDialog(
+        t('unplan_text', 'Its draft is deleted and the idea goes back to Ideas as new. You can plan it again on another date.') as string,
+        t('unplan', 'Un-plan') as string, t('unplan_title', 'Un-plan this post?') as string, t('cancel', 'Cancel') as string);
+      if (ok) await run(() => api.unplan(brandId, c.briefId!), t('unplanned', 'Un-planned: the idea is back in Ideas'));
+    },
   };
   const label: Record<Action, string> = {
     createDraft: t('create_draft', 'Create draft'), sendForReview: t('send_for_review', 'Send for review'),
     schedule: t('schedule', 'Schedule'), approve: t('approve', 'Approve'), sendBack: t('send_back', 'Send back'),
     stop: t('stop', 'Stop'), newDate: t('new_date', 'New date'), markPublished: t('mark_published', 'Mark published'),
+    unplan: t('unplan', 'Un-plan'),
   };
   const primary: Action[] = ['createDraft', 'sendForReview', 'schedule', 'approve'];
   const who = c.state === 'review' ? `${c.sentBy || ''} · ${t('sent_for_review_lc', 'sent for review')}`
@@ -135,7 +143,7 @@ export const BrandPostCard: FC<{
       )}
 
       <div className="flex flex-wrap items-center gap-[8px]">
-        {actions.map((a) => {
+        {actions.filter((a) => a !== 'unplan').map((a) => {
           const block = blockOf(a, c, now, ticks);
           return (
             <button key={a} disabled={busy || block !== ''} aria-describedby={a === 'approve' ? `hint-${c.key}` : block === 'media' ? `media-${c.key}` : undefined}
@@ -149,6 +157,7 @@ export const BrandPostCard: FC<{
             {c.comments ? `${c.comments} ${t('comments', 'comments')}` : t('comment', 'Comment')}
           </button>
         )}
+        {actions.includes('unplan') && <button className={QUIET} disabled={busy} onClick={go.unplan}>{label.unplan}</button>}
       </div>
 
       {form === 'date' && (

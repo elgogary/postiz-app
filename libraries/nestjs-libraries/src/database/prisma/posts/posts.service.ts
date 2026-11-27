@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   ValidationPipe,
 } from '@nestjs/common';
@@ -48,7 +49,7 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 // >>> SANAD-BRANDS
-import { BrandApprovalService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.approval.service';
+import { BrandApprovalService, Editor } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.approval.service';
 // <<< SANAD-BRANDS
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripLinks } from '@gitroom/helpers/utils/strip.links';
@@ -697,6 +698,23 @@ export class PostsService {
     return this._postRepository.getPostByForWebhookId(id);
   }
 
+  // >>> SANAD-BRANDS: the publish workflow never re-checks the post, so a held post stays safe only if its workflow ends.
+  // Unlike startWorkflow, an error here must reach the caller: the post is not saved while it could still publish.
+  async terminateWorkflows(postId: string) {
+    try {
+      const workflows = this._temporalService.client
+        .getRawClient()
+        .workflow.list({ query: `postId="${postId}" AND ExecutionStatus="Running"` });
+      for await (const executionInfo of workflows) {
+        const workflow = await this._temporalService.client.getWorkflowHandle(executionInfo.workflowId);
+        if ((await workflow.describe()).status.name !== 'TERMINATED') await workflow.terminate();
+      }
+    } catch (err) {
+      throw new HttpException('Could not unschedule this approved post; try again', 503);
+    }
+  }
+  // <<< SANAD-BRANDS
+
   async startWorkflow(
     taskQueue: string,
     postId: string,
@@ -882,7 +900,10 @@ export class PostsService {
   async createPost(
     orgId: string,
     body: CreatePostDto,
-    creationMethod: CreationMethod
+    creationMethod: CreationMethod,
+    // >>> SANAD-BRANDS
+    editor?: Editor
+    // <<< SANAD-BRANDS
   ): Promise<any[]> {
     // >>> SANAD-BRANDS: a brand whose posts need approval is scheduled only through Approve in Brands (spec rule 2)
     // Every type but 'draft' can leave a QUEUE post ('update' keeps the state, and a new row defaults to QUEUE). The root
@@ -893,9 +914,23 @@ export class PostsService {
         ...(p.value || []).slice(1).filter((v) => v.id).map((v) => ({ integrationId: p.integration.id, postId: v.id as string })),
       ]), { allowPublished: body.type === 'update' });
     }
+    // Editing an approved post sends it back to review (see BrandApprovalService.editsNeedingReview).
+    // Every item id of a post is checked, so a thread child id cannot carry the approved root past the check.
+    const heldOf = new Map<any, { postId: string; briefId: string }[]>();
+    for (const p of body.posts) {
+      heldOf.set(p, await this._brandApproval.editsNeedingReview(orgId, editor, (p.value || []).map((v) => v.id || '')));
+    }
     // <<< SANAD-BRANDS
     const postList = [];
     for (const post of body.posts) {
+      // >>> SANAD-BRANDS
+      const held = heldOf.get(post) || [];
+      const holdBack = held.length > 0;
+      // Stop the publish workflow before anything is saved; if that fails the post stays as it was.
+      if (holdBack) {
+        for (const h of held) await this.terminateWorkflows(h.postId);
+      }
+      // <<< SANAD-BRANDS
       const provider = this._integrationManager.getSocialIntegration(
         (post.settings as any)?.__type
       );
@@ -917,7 +952,9 @@ export class PostsService {
       }));
 
       const { posts } = await this._postRepository.createOrUpdatePost(
-        body.type,
+        // >>> SANAD-BRANDS
+        holdBack ? 'draft' : body.type,
+        // <<< SANAD-BRANDS
         orgId,
         body.type === 'now' ? dayjs().format('YYYY-MM-DDTHH:mm:00') : body.date,
         post,
@@ -930,7 +967,12 @@ export class PostsService {
         return [] as any[];
       }
 
-      if (body.type !== 'update') {
+      // >>> SANAD-BRANDS
+      if (holdBack) {
+        await this._brandApproval.putInReview(held.map((h) => h.briefId), editor);
+      }
+      // <<< SANAD-BRANDS
+      if (body.type !== 'update' && !holdBack) {
         this.startWorkflow(
           post.settings.__type.split('-')[0].toLowerCase(),
           posts[0].id,
@@ -994,13 +1036,27 @@ export class PostsService {
     orgId: string,
     id: string,
     date: string,
-    action: 'schedule' | 'update' = 'schedule'
+    action: 'schedule' | 'update' = 'schedule',
+    // >>> SANAD-BRANDS
+    editor?: Editor
+    // <<< SANAD-BRANDS
   ) {
     const getPostById = await this._postRepository.getPostById(id, orgId);
     // >>> SANAD-BRANDS
     // Dragging a failed or published post schedule it as a new QUEUE; only DRAFT (approval path) and QUEUE are exempt here.
     if (action === 'schedule' && getPostById.state !== 'DRAFT' && getPostById.state !== 'QUEUE') {
       await this._brandApproval.assertCanQueue(orgId, [{ integrationId: getPostById.integrationId }]);
+    }
+    // <<< SANAD-BRANDS
+
+    // >>> SANAD-BRANDS: moving an approved post sends it back to review, like any other edit. Decided before any write:
+    // the workflow is ended first (failing loudly), then the date and DRAFT are written together.
+    const held = await this._brandApproval.editsNeedingReview(orgId, editor, [id]);
+    if (held.length) {
+      await this.terminateWorkflows(id);
+      const heldDate = await this._postRepository.changeDate(orgId, id, date, true, action, true);
+      await this._brandApproval.putInReview(held.map((h) => h.briefId), editor);
+      return heldDate;
     }
     // <<< SANAD-BRANDS
 

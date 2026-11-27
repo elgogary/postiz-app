@@ -7,7 +7,7 @@ export type ReviewState = 'NONE' | 'IN_REVIEW' | 'SENT_BACK' | 'APPROVED';
 export type PostizState = 'QUEUE' | 'PUBLISHED' | 'ERROR' | 'DRAFT';
 export type CardState = 'planned' | 'draft' | 'review' | 'changes' | 'scheduled' | 'published' | 'error';
 export type Format = 'Text' | 'Carousel' | 'Image' | 'Video' | 'Poll';
-export type Action = 'createDraft' | 'sendForReview' | 'schedule' | 'approve' | 'sendBack' | 'stop' | 'newDate' | 'markPublished';
+export type Action = 'createDraft' | 'sendForReview' | 'schedule' | 'approve' | 'sendBack' | 'stop' | 'newDate' | 'markPublished' | 'unplan';
 export type Block = '' | 'media' | 'date' | 'ticks';
 
 export const FORMATS: Format[] = ['Text', 'Carousel', 'Image', 'Video', 'Poll'];
@@ -27,7 +27,7 @@ export interface Card {
   key: string; briefId: string | null; postId: string | null; group: string | null;
   date: string; state: CardState; format: Format; goal: string; pillars: string[];
   title: string; sub: string; caption: string; slidesLabel: string; slides: string[];
-  visual: string; imagePrompt: string; why: string; verify: string; firstDraft: boolean;
+  visual: string; imagePrompt: string; why: string; verify: string; firstDraft: boolean; fromIdea: boolean;
   media: MediaItem[]; channel: string; sentBy: string | null; decidedBy: string | null; comments: number;
   lastNote: Note | null;
 }
@@ -35,7 +35,7 @@ export interface BriefRow {
   id: string; postId: string | null; plannedAt: string; format: Format; goal: string; pillars: string[];
   title: string; sub: string; caption: string; slidesLabel: string; slides: string[]; visual: string;
   imagePrompt: string; why: string; verify: string; firstDraft: boolean; review: ReviewState;
-  sentById: string | null; decidedById: string | null;
+  sentById: string | null; decidedById: string | null; ideaId?: string | null;
 }
 export interface PostRow {
   id: string; group: string; publishDate: string; state: PostizState; content: string; image: MediaItem[];
@@ -91,6 +91,8 @@ export const actionsFor = (role: BrandRole, requiresApproval: boolean, c: Card, 
   // A failed post (ERROR) goes back to Draft through Stop, then through review again (rule 2 has no other way back).
   if ((c.state === 'review' || c.state === 'scheduled' || c.state === 'error') && approve) out.push('stop');
   if (c.format === 'Poll' && approve && (c.state === 'draft' || c.state === 'review' || c.state === 'scheduled')) out.push('markPublished');
+  // Un-plan: a post planned from an idea, not yet sent for review (a plan-imported post never has it).
+  if (create && c.fromIdea && (c.state === 'planned' || c.state === 'draft')) out.push('unplan');
   return out;
 };
 
@@ -119,7 +121,7 @@ export function buildCards(briefs: BriefRow[], posts: PostRow[], names: Record<s
       date: p?.publishDate || b.plannedAt, state: stateOf(!!p, p?.state || null, b.review), format: b.format,
       goal: b.goal, pillars: b.pillars, title: b.title, sub: b.sub, caption: b.caption || (p ? textOf(p.content) : ''),
       slidesLabel: b.slidesLabel, slides: b.slides, visual: b.visual, imagePrompt: b.imagePrompt, why: b.why,
-      verify: b.verify, firstDraft: b.firstDraft, media: p?.image || [], channel: p?.channel || '',
+      verify: b.verify, firstDraft: b.firstDraft, fromIdea: !!b.ideaId, media: p?.image || [], channel: p?.channel || '',
       sentBy: name(b.sentById), decidedBy: name(b.decidedById), comments: p?.comments || 0, lastNote: p?.lastNote || null,
     };
   });
@@ -130,7 +132,7 @@ export function buildCards(briefs: BriefRow[], posts: PostRow[], names: Record<s
       key: `p:${p.id}`, briefId: null, postId: p.id, group: p.group, date: p.publishDate,
       state: stateOf(true, p.state, 'NONE'), format: inferFormat(p.image), goal: '', pillars: [],
       title: text.split('\n')[0].slice(0, 80), sub: '', caption: text, slidesLabel: '', slides: [], visual: '',
-      imagePrompt: '', why: '', verify: '', firstDraft: false, media: p.image, channel: p.channel,
+      imagePrompt: '', why: '', verify: '', firstDraft: false, fromIdea: false, media: p.image, channel: p.channel,
       sentBy: null, decidedBy: null, comments: p.comments, lastNote: p.lastNote,
     });
   }

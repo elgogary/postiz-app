@@ -1,9 +1,10 @@
 // >>> SANAD-BRANDS: a brand's posts as cards, the review actions (spec rules 1 to 5) and comments.
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PostBrief } from '@prisma/client';
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandPostsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.posts.repository';
+import { BrandIdeasRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.ideas.repository';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { BrandRole, OrgRole, canApprove, canEdit } from '@gitroom/helpers/brands/brand.rules';
 import {
@@ -29,6 +30,7 @@ const asBrief = (b: PostBrief): BriefRow => ({
   pillars: b.pillars, title: b.title, sub: b.sub, caption: b.caption, slidesLabel: b.slidesLabel,
   slides: Array.isArray(b.slides) ? (b.slides as string[]) : [], visual: b.visual, imagePrompt: b.imagePrompt, why: b.why,
   verify: b.verify, firstDraft: b.firstDraft, review: b.review as ReviewState, sentById: b.sentById, decidedById: b.decidedById,
+  ideaId: b.ideaId,
 });
 
 const pinsOf = (b: PostBrief | null): Record<string, number> =>
@@ -36,7 +38,8 @@ const pinsOf = (b: PostBrief | null): Record<string, number> =>
 
 @Injectable()
 export class BrandReviewService {
-  constructor(private _brands: BrandsService, private _repo: BrandPostsRepository, private _posts: PostsService) {}
+  constructor(private _brands: BrandsService, private _repo: BrandPostsRepository, private _posts: PostsService,
+    private _ideas: BrandIdeasRepository) {}
 
   async cards(orgId: string, userId: string, orgRole: OrgRole, customerId: string) {
     const ctx = await this._brands.context(orgId, userId, orgRole, customerId);
@@ -200,6 +203,28 @@ export class BrandReviewService {
       postId: made.postId, review: 'NONE', sentById: null, sentAt: null, decidedById: null, decidedAt: null, ownCheckedBy: null, listCheckedBy: null,
     });
     return { postId: made.postId as string };
+  }
+
+  // Un-plan: a post planned from an idea and not yet sent for review goes back to the idea as New. The brief is deleted
+  // first, by a conditional delete: only one of two racing calls wins, and only the winner deletes the draft.
+  async unplan(orgId: string, userId: string, orgRole: OrgRole, customerId: string, briefId: string) {
+    const ctx = await this._brands.context(orgId, userId, orgRole, customerId);
+    this.mustCreate(ctx.role);
+    const brief = await this._repo.brief(orgId, customerId, briefId);
+    if (!brief) throw new NotFoundException('Planned post not found');
+    if (!brief.ideaId) throw new BadRequestException('Only a post planned from an idea can be un-planned');
+    if (brief.review !== 'NONE') throw new BadRequestException('This post was already sent for review: stop it first');
+    let post: { group: string; state: string } | null = brief.postId ? await this._repo.post(orgId, ctx.channels.map((c) => c.id), brief.postId) : null;
+    if (!post && brief.postId) {
+      // The post may sit on a channel no longer in this brand: it still must not be live when the brief goes.
+      const other = await this._repo.postAnywhere(orgId, brief.postId);
+      if (other && !other.deletedAt) post = other;
+    }
+    if (post && post.state !== 'DRAFT') throw new BadRequestException('Only a planned or draft post can be un-planned');
+    if ((await this._repo.deleteUnplanned(orgId, brief.id)) !== 1) throw new ConflictException('This post was already un-planned');
+    await this._ideas.release(orgId, brief.ideaId, brief.id);
+    if (post) await this._posts.deletePost(orgId, post.group);
+    return { ok: true };
   }
 
   async markPublished(orgId: string, userId: string, orgRole: OrgRole, customerId: string, postId: string) {

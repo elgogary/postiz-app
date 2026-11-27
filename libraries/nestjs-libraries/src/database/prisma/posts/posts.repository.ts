@@ -466,7 +466,10 @@ export class PostsRepository {
     id: string,
     date: string,
     isDraft: boolean,
-    action: 'schedule' | 'update' = 'schedule'
+    action: 'schedule' | 'update' = 'schedule',
+    // >>> SANAD-BRANDS: a held post is written as DRAFT with its date in the same update
+    forceDraft = false
+    // <<< SANAD-BRANDS
   ) {
     return this._post.model.post.update({
       where: {
@@ -477,9 +480,9 @@ export class PostsRepository {
         publishDate: dayjs(date).toDate(),
         // schedule: set state to QUEUE (or DRAFT if it was a draft)
         // update: don't change the state
-        ...(action === 'schedule'
+        ...(action === 'schedule' || forceDraft
           ? {
-              state: isDraft ? 'DRAFT' : 'QUEUE',
+              state: isDraft || forceDraft ? 'DRAFT' : 'QUEUE',
               releaseId: null,
               releaseURL: null,
             }

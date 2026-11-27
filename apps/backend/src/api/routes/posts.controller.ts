@@ -21,6 +21,7 @@ import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator
 import { CreateGeneratedPostsDto } from '@gitroom/nestjs-libraries/dtos/generator/create.generated.posts.dto';
 import { AgentGraphService } from '@gitroom/nestjs-libraries/agent/agent.graph.service';
 import { Response } from 'express';
+import { orgRoleOf } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service'; // SANAD-BRANDS
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
@@ -180,7 +181,10 @@ export class PostsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createPost(
     @GetOrgFromRequest() org: Organization,
-    @Body() rawBody: any
+    @Body() rawBody: any,
+    // >>> SANAD-BRANDS
+    @GetUserFromRequest() user: User
+    // <<< SANAD-BRANDS
   ) {
     // Server-side validation — never trust the client to have validated.
     const validation = await this._postsService.validatePosts(
@@ -220,7 +224,7 @@ export class PostsController {
     }
 
     const body = await this._postsService.mapTypeToPost(rawBody, org.id);
-    return this._postsService.createPost(org.id, body, 'WEB');
+    return this._postsService.createPost(org.id, body, 'WEB', { userId: user.id, orgRole: orgRoleOf(org) }); // SANAD-BRANDS
   }
 
   @Post('/generator/draft')
@@ -260,9 +264,12 @@ export class PostsController {
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
     @Body('date') date: string,
-    @Body('action') action: 'schedule' | 'update' = 'schedule'
+    @Body('action') action: 'schedule' | 'update' = 'schedule',
+    // >>> SANAD-BRANDS
+    @GetUserFromRequest() user: User
+    // <<< SANAD-BRANDS
   ) {
-    return this._postsService.changeDate(org.id, id, date, action);
+    return this._postsService.changeDate(org.id, id, date, action, { userId: user.id, orgRole: orgRoleOf(org) }); // SANAD-BRANDS
   }
 
   @Post('/separate-posts')

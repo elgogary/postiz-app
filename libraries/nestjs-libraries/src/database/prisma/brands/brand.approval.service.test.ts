@@ -46,3 +46,57 @@ test('a queued post of another organization is not exempt', async () => {
   const posts = [{ id: 'p1', integrationId: 'i1', state: 'QUEUE', organizationId: 'other' }];
   await assert.rejects(new BrandApprovalService(fake(posts, moon, []) as never).assertCanQueue('o', [{ integrationId: 'i1', postId: 'p1' }]), ForbiddenException);
 });
+
+// Rule: an edit by someone who may not approve sends an approved, scheduled post back to review.
+function editSetup(o: { brief?: boolean; queued?: boolean; off?: boolean; access?: string } = {}) {
+  const updates: unknown[] = [];
+  const prisma = { model: {
+    postBrief: {
+      findMany: async () => (o.brief === false ? [] : [{ id: 'b1', postId: 'p1', customerId: 'm' }]),
+      updateMany: async (a: unknown) => { updates.push(a); return {}; },
+    },
+    post: { findMany: async ({ where }: { where: { id: { in: string[] }; parentPostId?: unknown } }) =>
+      (where.parentPostId && typeof where.parentPostId === 'object'
+        ? where.id.in.filter((i) => i === 'c1').map(() => ({ parentPostId: 'p1' }))
+        : o.queued === false ? [] : [{ id: 'p1' }]) },
+    brandSettings: { findMany: async () => (o.off ? [{ customerId: 'm', requiresApproval: false }] : []) },
+    brandAccess: { findMany: async () => (o.access ? [{ customerId: 'm', role: o.access }] : []) },
+  } };
+  return { svc: new BrandApprovalService(prisma as never), updates };
+}
+const ed = (orgRole: 'USER' | 'ADMIN' = 'USER') => ({ userId: 'u1', orgRole });
+
+test('an editor without the approve right sends an approved post back to review', async () => {
+  for (const access of [undefined, 'VIEW', 'CREATE']) {
+    const { svc, updates } = editSetup({ access });
+    const held = await svc.editsNeedingReview('o', ed(), ['p1']);
+    assert.deepEqual(held, [{ postId: 'p1', briefId: 'b1' }]);
+    await svc.putInReview(held.map((h) => h.briefId), ed());
+    const data = (updates[0] as { data: Record<string, unknown> }).data;
+    assert.equal(data.review, 'IN_REVIEW');
+    assert.equal(data.sentById, 'u1');
+    assert.equal(data.decidedById, null);
+    assert.equal(data.decidedAt, null);
+  }
+});
+
+test('an approver (brand approve or org admin) editing keeps the post approved', async () => {
+  assert.deepEqual(await editSetup({ access: 'APPROVE' }).svc.editsNeedingReview('o', ed(), ['p1']), []);
+  assert.deepEqual(await editSetup().svc.editsNeedingReview('o', ed('ADMIN'), ['p1']), []);
+});
+
+test('a save with no known editor (API key, MCP) counts as a non-approver', async () => {
+  assert.equal((await editSetup().svc.editsNeedingReview('o', undefined, ['p1'])).length, 1);
+});
+
+test('a brand without an approval step, a post with no approved brief, or a post not scheduled is unchanged', async () => {
+  assert.deepEqual(await editSetup({ off: true }).svc.editsNeedingReview('o', ed(), ['p1']), []);
+  assert.deepEqual(await editSetup({ brief: false }).svc.editsNeedingReview('o', ed(), ['p1']), []);
+  assert.deepEqual(await editSetup({ queued: false }).svc.editsNeedingReview('o', ed(), ['p1']), []);
+  assert.deepEqual(await editSetup().svc.editsNeedingReview('o', ed(), ['', '']), []);
+});
+
+test('a thread child id in the body counts as its approved root', async () => {
+  const held = await editSetup().svc.editsNeedingReview('o', ed(), ['c1']);
+  assert.deepEqual(held, [{ postId: 'p1', briefId: 'b1' }]);
+});
