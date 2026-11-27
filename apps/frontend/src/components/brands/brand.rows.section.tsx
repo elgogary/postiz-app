@@ -70,11 +70,13 @@ export const BrandRowsSection: FC<{
     <article className="bg-sixth border border-fifth rounded-[12px] p-[24px] flex flex-col gap-[16px]">
       <div className="flex items-start gap-[16px]">
         <div>
-          <h3 className="text-[16px] font-[600]">{label}</h3>
+          <h3 className="text-[18px] font-[600]">{label}</h3>
           {rows.length > 0 && !draft && <div className="text-[12px] text-customColor18">{rows.length} {t('rows', 'rows')}{data?.updatedBy ? ` · ${data.updatedBy}` : ''}</div>}
         </div>
         {canEdit && !draft && (
-          <button className="ms-auto text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] hover:bg-newColColor" onClick={start}>{t('edit', 'Edit')}</button>
+          <button className="ms-auto text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] hover:bg-newColColor" aria-label={`${t('edit', 'Edit')} ${label}`} onClick={start}>
+            {label.length <= 20 ? `${t('edit', 'Edit')} ${label}` : t('edit', 'Edit')}
+          </button>
         )}
       </div>
       {data?.note && !draft && <p className="text-[13px] text-customColor18" dir={dirOf(data.note)}>{data.note}</p>}

@@ -18,8 +18,8 @@ export const BrandFocus: FC<{ data?: SectionData; canEdit: boolean; onSave: (row
   return (
     <article className="bg-sixth border border-fifth rounded-[12px] p-[24px] flex flex-col gap-[16px]">
       <div className="flex items-start gap-[16px]">
-        <h3 className="text-[16px] font-[600]">{t('focus', 'Focus')}</h3>
-        {canEdit && <button className="ms-auto text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] hover:bg-newColColor" onClick={() => setEditing(true)}>{t('edit', 'Edit')}</button>}
+        <h3 className="text-[18px] font-[600]">{t('focus', 'Focus')}</h3>
+        {canEdit && <button className="ms-auto text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] hover:bg-newColColor" onClick={() => setEditing(true)}>{t('edit', 'Edit')} {t('focus', 'Focus')}</button>}
       </div>
       {rows.length ? (
         <div className="grid gap-[16px] [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">

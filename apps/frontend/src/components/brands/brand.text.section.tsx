@@ -95,7 +95,7 @@ export const BrandTextSection: FC<{
     <article className="bg-sixth border border-fifth rounded-[12px] p-[24px] flex flex-col gap-[16px]">
       <div className="flex items-start gap-[16px]">
         <div>
-          <h3 className="text-[16px] font-[600]">{label}</h3>
+          <h3 className="text-[18px] font-[600]">{label}</h3>
           {data?.updatedBy && !editing && (
             <div className="text-[12px] text-customColor18">
               {t('last_edited_by', 'Last edited by')} {data.updatedBy} · {new Date(data.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -103,8 +103,8 @@ export const BrandTextSection: FC<{
           )}
         </div>
         {canEdit && !editing && (
-          <button className="ms-auto text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] hover:bg-newColColor" onClick={() => setEditing(true)}>
-            {t('edit', 'Edit')}
+          <button className="ms-auto text-[13px] px-[16px] h-[36px] [@media(max-width:480px)]:h-[44px] rounded-[8px] hover:bg-newColColor" aria-label={`${t('edit', 'Edit')} ${label}`} onClick={() => setEditing(true)}>
+            {label.length <= 20 ? `${t('edit', 'Edit')} ${label}` : t('edit', 'Edit')}
           </button>
         )}
       </div>

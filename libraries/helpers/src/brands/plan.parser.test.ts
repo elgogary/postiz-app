@@ -63,6 +63,15 @@ test('inline a and span stay inside their paragraph; block tags still break line
   assert.match(block.sections.summary, /<p>One<\/p>\n<p>Two<\/p>/);
 });
 
+test('a plan that keeps its voice in a "guide" section fills Voice from it; a "voice" section wins when both exist', () => {
+  const guideOnly = parsePlan(MINI.replace('id="voice"><div>Voice line</div>', 'id="guide"><div>Label</div><p>Guide words</p>'));
+  assert.match(guideOnly.sections.voice, /Guide words/);
+  assert.match(guideOnly.sections.voice, /Own words/);
+  assert.ok(MINI.includes('<section id="bench">'), 'the test inserts its guide section before bench');
+  const both = parsePlan(MINI.replace('<section id="bench">', '<section id="guide"><div>Label</div><p>Guide words</p></section>\n<section id="bench">'));
+  assert.doesNotMatch(both.sections.voice, /Guide words/);
+});
+
 const datedPlan = (weeks: string, firstDate: string) => MINI
   .replace(/const WEEKS=\[.*\];/, `const WEEKS=${weeks};`).replace('date:"2026-11-15"', `date:"${firstDate}"`).replace('date:"2026-11-30"', `date:"${firstDate}"`);
 
