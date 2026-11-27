@@ -88,7 +88,7 @@ test('import: stores each campaign as Brevo counts it, maps only lists that are 
   const r = await s.importHistory(...admin, [6, 4], { 5: 21, 7: 99 });
   assert.deepEqual(r, { imported: 2, campaigns: [{ id: 6, name: 'Spring offer 6' }, { id: 4, name: 'Spring offer 4' }] });
   const h = store.find((x) => x.sourceId === '6')!;
-  assert.deepEqual([h.listIds, h.listNames], [[21], ['Brevo list 5']], 'list 7 maps outside the brand, list 8 is not mapped');
+  assert.deepEqual([h.listIds, h.listNames], [[21], ['Brevo list 5', 'Brevo list 7', 'Brevo list 8']], 'every list is named; only 5 counts (7 maps outside the brand, 8 is not mapped)');
   assert.deepEqual([h.sent, h.delivered, h.hardBounces, h.softBounces, h.opens, h.uncertainOpens, h.clicks, h.unsubscribed], [200, 180, 6, 4, 90, 20, 5, 3]);
   assert.deepEqual(h.links, [{ url: 'https://acme.test/a', clicks: 2 }, { url: 'https://acme.test/b', clicks: 6 }]);
   assert.equal(h.sender, 'hello@acme.test');
@@ -149,7 +149,7 @@ test('report and preview for a history campaign come from the table, for any mem
   assert.deepEqual(r.notDelivered, { hard: 6, soft: 4, blocked: 0 });
   assert.equal(r.uncertainOpens, 20);
   assert.equal(r.from, 'hello@acme.test');
-  assert.deepEqual(r.lists, [{ id: 21, name: 'Brevo list 5' }]);
+  assert.deepEqual(r.lists.map((l) => l.name), ['Brevo list 5', 'Brevo list 7', 'Brevo list 8']);
   assert.deepEqual(r.links.map((l) => l.clicks), [6, 2]);
   assert.deepEqual(r.history, [{ step: 'sent_before_hub', by: null, at: sentDate }]);
   assert.deepEqual(await s.preview(...user, 'history', 6), { html: '<p>مرحبا</p>' });

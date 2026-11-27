@@ -61,12 +61,12 @@ export async function readBrevoCampaign(id: number, map: Map<number, number>, ow
     const g = c.statistics?.globalStats || {};
     const listIds: number[] = [];
     const listNames: string[] = [];
+    // every list the campaign went to is named on its page; only lists brought over (and the brand's own) count for Last email
     for (const b of c.recipients?.lists || []) {
-      const to = map.get(b);
-      if (to === undefined || !own.has(to)) continue;
       if (!names.has(b)) names.set(b, (await brevo<{ name?: string }>(`/contacts/lists/${b}`))?.name || `List ${b}`);
-      listIds.push(to);
       listNames.push(names.get(b) as string);
+      const to = map.get(b);
+      if (to !== undefined && own.has(to)) listIds.push(to);
     }
     return {
       sourceId: String(id), name: String(c.name || c.subject || `Campaign ${id}`).slice(0, 200), subject: String(c.subject || '').slice(0, 500),
@@ -89,7 +89,7 @@ export const historyCampaignRow = (h: HistoryRow): EmailCampaignRow => ({
 export const historyReport = (h: HistoryRow): EmailReport => ({
   row: historyCampaignRow(h),
   from: h.sender,
-  lists: h.listIds.map((id, i) => ({ id, name: h.listNames[i] || '' })),
+  lists: h.listNames.map((name, i) => ({ id: i, name })),
   delivered: rate(h.delivered, h.sent),
   notDelivered: { hard: h.hardBounces, soft: h.softBounces, blocked: 0 },
   uncertainOpens: h.uncertainOpens,
