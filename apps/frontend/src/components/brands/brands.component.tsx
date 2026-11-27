@@ -185,7 +185,7 @@ export const Brands: FC = () => {
         {ready && (
           <div className="flex items-center gap-[16px] flex-wrap">
             <div>
-              <div className="text-[20px] font-[600]"><span className="text-customColor18 font-[500]">{t('brands', 'Brands')} /</span> {ready.name}</div>
+              <div className="text-[22px] font-[600]"><span className="text-customColor18 font-[500]">{t('brands', 'Brands')} /</span> {ready.name}</div>
               <div className="flex gap-[8px] items-center text-[13px] text-customColor18 mt-[8px] flex-wrap">
                 <span>{ready.channels.map((c) => c.name).join(' · ')}</span>
                 <span className="px-[8px] py-[4px] rounded-[6px] border border-fifth">{ready.requiresApproval ? t('posts_need_approval', 'Posts need approval') : t('no_approval_step', 'No approval step')}</span>

@@ -32,7 +32,7 @@ export const BrandStands: FC<{ cards: Card[]; role: BrandRole; window: { from: s
   return (
     <section className="bg-sixth border border-fifth rounded-[12px] p-[16px] flex flex-col gap-[16px]">
       <div className="flex flex-wrap items-center gap-[8px]">
-        <h3 className="text-[15px] font-[600]">{t('where_it_stands', 'Where it stands')}</h3>
+        <h3 className="text-[18px] font-[600]">{t('where_it_stands', 'Where it stands')}</h3>
         <span className="ms-auto text-[13px] text-customColor18">
           {s.nextScheduled ? `${t('next_post', 'Next post')} ${fmtDay(s.nextScheduled)}` : t('nothing_scheduled', 'Nothing scheduled')}
         </span>
