@@ -30,6 +30,12 @@ export class BrandPostsController {
     return this._review.briefDate(org.id, user.id, orgRoleOf(org), customerId, briefId, body);
   }
 
+  @Post('/:customerId/briefs/:briefId/unplan')
+  unplan(@GetOrgFromRequest() org: Organization, @GetUserFromRequest() user: User, @Param('customerId') customerId: string,
+    @Param('briefId') briefId: string) {
+    return this._review.unplan(org.id, user.id, orgRoleOf(org), customerId, briefId);
+  }
+
   @Post('/:customerId/posts/:postId/review')
   review(@GetOrgFromRequest() org: Organization, @GetUserFromRequest() user: User, @Param('customerId') customerId: string, @Param('postId') postId: string) {
     return this._review.sendForReview(org.id, user.id, orgRoleOf(org), customerId, postId);

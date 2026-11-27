@@ -48,7 +48,7 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 // >>> SANAD-BRANDS
-import { BrandApprovalService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.approval.service';
+import { BrandApprovalService, Editor } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.approval.service';
 // <<< SANAD-BRANDS
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripLinks } from '@gitroom/helpers/utils/strip.links';
@@ -882,7 +882,10 @@ export class PostsService {
   async createPost(
     orgId: string,
     body: CreatePostDto,
-    creationMethod: CreationMethod
+    creationMethod: CreationMethod,
+    // >>> SANAD-BRANDS
+    editor?: Editor
+    // <<< SANAD-BRANDS
   ): Promise<any[]> {
     // >>> SANAD-BRANDS: a brand whose posts need approval is scheduled only through Approve in Brands (spec rule 2)
     // Every type but 'draft' can leave a QUEUE post ('update' keeps the state, and a new row defaults to QUEUE). The root
@@ -893,9 +896,15 @@ export class PostsService {
         ...(p.value || []).slice(1).filter((v) => v.id).map((v) => ({ integrationId: p.integration.id, postId: v.id as string })),
       ]), { allowPublished: body.type === 'update' });
     }
+    // Editing an approved post sends it back to review (see BrandApprovalService.editsNeedingReview).
+    const held = await this._brandApproval.editsNeedingReview(orgId, editor, body.posts.map((p) => p.value?.[0]?.id || ''));
+    const heldIds = new Set(held.map((h) => h.postId));
     // <<< SANAD-BRANDS
     const postList = [];
     for (const post of body.posts) {
+      // >>> SANAD-BRANDS
+      const holdBack = heldIds.has(post.value?.[0]?.id || '');
+      // <<< SANAD-BRANDS
       const provider = this._integrationManager.getSocialIntegration(
         (post.settings as any)?.__type
       );
@@ -917,7 +926,9 @@ export class PostsService {
       }));
 
       const { posts } = await this._postRepository.createOrUpdatePost(
-        body.type,
+        // >>> SANAD-BRANDS
+        holdBack ? 'draft' : body.type,
+        // <<< SANAD-BRANDS
         orgId,
         body.type === 'now' ? dayjs().format('YYYY-MM-DDTHH:mm:00') : body.date,
         post,
@@ -930,7 +941,12 @@ export class PostsService {
         return [] as any[];
       }
 
-      if (body.type !== 'update') {
+      // >>> SANAD-BRANDS
+      if (holdBack) {
+        await this._brandApproval.putInReview(held.filter((h) => h.postId === post.value?.[0]?.id).map((h) => h.briefId), editor);
+      }
+      // <<< SANAD-BRANDS
+      if (body.type !== 'update' || holdBack) {
         this.startWorkflow(
           post.settings.__type.split('-')[0].toLowerCase(),
           posts[0].id,
@@ -994,7 +1010,10 @@ export class PostsService {
     orgId: string,
     id: string,
     date: string,
-    action: 'schedule' | 'update' = 'schedule'
+    action: 'schedule' | 'update' = 'schedule',
+    // >>> SANAD-BRANDS
+    editor?: Editor
+    // <<< SANAD-BRANDS
   ) {
     const getPostById = await this._postRepository.getPostById(id, orgId);
     // >>> SANAD-BRANDS
@@ -1013,6 +1032,18 @@ export class PostsService {
       getPostById.state === 'DRAFT',
       action
     );
+
+    // >>> SANAD-BRANDS: moving an approved post sends it back to review, like any other edit
+    const held = await this._brandApproval.editsNeedingReview(orgId, editor, [id]);
+    if (held.length) {
+      await this._postRepository.changeState(id, 'DRAFT');
+      await this._brandApproval.putInReview(held.map((h) => h.briefId), editor);
+      try {
+        await this.startWorkflow(getPostById.integration.providerIdentifier.split('-')[0].toLowerCase(), id, orgId, 'DRAFT');
+      } catch (err) {}
+      return newDate;
+    }
+    // <<< SANAD-BRANDS
 
     if (action === 'schedule') {
       try {
