@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpException,
   HttpStatus,
   Post,
@@ -39,7 +40,7 @@ export class OAuthController {
   }
 
   @Post('/token')
-  async token(@Body() body: TokenExchangeDto) {
+  async token(@Body() body: TokenExchangeDto, @Headers('authorization') authorization?: string) {
     if (body.grant_type !== 'authorization_code') {
       throw new HttpException(
         { error: 'unsupported_grant_type' },
@@ -47,11 +48,18 @@ export class OAuthController {
       );
     }
 
-    return this._oauthService.exchangeCodeForToken(
-      body.code,
-      body.client_id,
-      body.client_secret
-    );
+    // >>> SANAD-BRANDS: client_secret_basic (RFC 6749 2.3.1), the default when a client is not told otherwise
+    let [clientId, clientSecret] = [body.client_id, body.client_secret];
+    if ((!clientId || !clientSecret) && authorization?.startsWith('Basic ')) {
+      const [id, ...secret] = Buffer.from(authorization.slice(6), 'base64').toString('utf8').split(':');
+      [clientId, clientSecret] = [decodeURIComponent(id), decodeURIComponent(secret.join(':'))];
+    }
+    if (!clientId || !clientSecret) {
+      throw new HttpException({ error: 'invalid_client' }, HttpStatus.UNAUTHORIZED);
+    }
+    // <<< SANAD-BRANDS
+
+    return this._oauthService.exchangeCodeForToken(body.code, clientId, clientSecret);
   }
 }
 
