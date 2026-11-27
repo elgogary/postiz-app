@@ -16,7 +16,7 @@ export const EmailImportModal: FC<{ brandId: string; brandName: string; lists: E
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState<{ imported: number; skipped: number } | null>(null);
+  const [done, setDone] = useState<{ processed: number; skipped: number } | null>(null);
 
   const run = async () => {
     const [channelId, id] = at.split(':');
@@ -33,7 +33,7 @@ export const EmailImportModal: FC<{ brandId: string; brandName: string; lists: E
   if (done) {
     return (
       <div className="flex flex-col gap-[16px] min-w-[min(480px,calc(100vw_-_64px))]">
-        <div className="text-[14px]">{done.imported} {t('email_contacts_added', 'contacts added')}, {done.skipped} {t('email_skipped', 'skipped')}</div>
+        <div className="text-[14px]">{done.processed} {t('email_contacts_processed', 'contacts processed')}, {done.skipped} {t('email_rows_invalid', 'rows without a valid address')}</div>
         <div className="flex justify-end"><button className={QUIET} onClick={close}>{t('close', 'Close')}</button></div>
       </div>
     );

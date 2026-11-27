@@ -16,7 +16,7 @@ export class BrandEmailRepository {
   postsByRelease(orgId: string, integrationId: string, releaseURLs: string[]) {
     if (!releaseURLs.length) return Promise.resolve([] as { id: string; releaseURL: string | null }[]);
     return this._prisma.model.post.findMany({
-      where: { organizationId: orgId, integrationId, deletedAt: null, releaseURL: { in: releaseURLs } },
+      where: { organizationId: orgId, integrationId, releaseURL: { in: releaseURLs } },
       select: { id: true, releaseURL: true },
     });
   }

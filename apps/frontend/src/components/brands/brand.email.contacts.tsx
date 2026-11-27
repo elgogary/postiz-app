@@ -28,7 +28,7 @@ export const EmailContactsView: FC<{ brandId: string; list: EmailListRow; go: Em
       const d = await api.emailContacts(brandId, list.channelId, list.id, page);
       if (mine === seq.current) setData(d);
     } catch (e) {
-      if (mine === seq.current) setError(errorText(e, tt.current));
+      if (mine === seq.current) { setData(null); setError(errorText(e, tt.current)); }
     }
   }, [api, brandId, list.channelId, list.id, page]);
   useEffect(() => { load(); return () => { seq.current += 1; }; }, [load]);
@@ -39,7 +39,7 @@ export const EmailContactsView: FC<{ brandId: string; list: EmailListRow; go: Em
       <div className="text-[13px] text-customColor18">
         <button className="font-[600] text-[#5221b8] dark:text-[#c4b5fd] [@media(max-width:480px)]:min-h-[44px]" onClick={() => go({ tab: 'email', filter: 'lists' })}>{t('email_lists', 'Lists')}</button> / <Text text={list.name} />
       </div>
-      {error && !data ? <Retry text={error} onRetry={load} /> : !data ? <Skeleton /> : (
+      {error ? <Retry text={error} onRetry={load} /> : !data ? <Skeleton /> : (
         <>
           <div className="overflow-x-auto border border-fifth rounded-[12px]">
             <table className="w-full min-w-[640px] border-separate border-spacing-0 text-[14px]">

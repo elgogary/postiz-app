@@ -136,8 +136,8 @@ export function readContacts(text: string): ContactsFile {
 const csvCell = (v: string) => `"${v.replace(/"/g, '""')}"`;
 
 // Listmonk's import file: email, name, attributes (JSON), with who confirmed the agreement and when on every person.
-export const listmonkImportCsv = (contacts: { email: string; name: string }[], by: string, at: string) =>
+export const listmonkImportCsv = (contacts: { email: string; name: string }[], by: { id: string; name: string }, at: string) =>
   ['email,name,attributes', ...contacts.map((c) =>
-    [c.email, c.name || c.email.split('@')[0], JSON.stringify({ consent: { by, at, source: 'hub-import' } })].map(csvCell).join(','),
+    [c.email, c.name || c.email.split('@')[0], JSON.stringify({ consent: { by: by.name, byId: by.id, at, source: 'hub-import' } })].map(csvCell).join(','),
   )].join('\n');
 // <<< SANAD-BRANDS

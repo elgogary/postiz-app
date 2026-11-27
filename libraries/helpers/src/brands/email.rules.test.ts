@@ -78,10 +78,10 @@ test('an empty file, a file with no address and a file too long are refused', ()
 });
 
 test('the Listmonk import file carries who confirmed the agreement on every person', () => {
-  const csv = listmonkImportCsv([{ email: 'a@x.com', name: 'Ali "A"' }, { email: 'b@y.com', name: '' }], 'Mona', '2026-11-27T10:00:00Z');
+  const csv = listmonkImportCsv([{ email: 'a@x.com', name: 'Ali "A"' }, { email: 'b@y.com', name: '' }], { id: 'u-1', name: 'Mona' }, '2026-11-27T10:00:00Z');
   const rows = parseCsv(csv);
   assert.deepEqual(rows[0], ['email', 'name', 'attributes']);
   assert.deepEqual(rows[1].slice(0, 2), ['a@x.com', 'Ali "A"']);
   assert.equal(rows[2][1], 'b');
-  assert.deepEqual(JSON.parse(rows[1][2]), { consent: { by: 'Mona', at: '2026-11-27T10:00:00Z', source: 'hub-import' } });
+  assert.deepEqual(JSON.parse(rows[1][2]), { consent: { by: 'Mona', byId: 'u-1', at: '2026-11-27T10:00:00Z', source: 'hub-import' } });
 });

@@ -1,9 +1,10 @@
 // Run inside the image: docker run --rm --entrypoint sh <image> -c "cd /app && npx -y tsx@4.19.2 --test libraries/nestjs-libraries/src/database/prisma/brands/brand.email.service.test.ts"
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
 import { BrandEmailService } from './brand.email.service';
-import { clearRelayCache } from './brand.email.engine';
+import { clearRelayCache, relayReport } from './brand.email.engine';
+import { clearLoadCache } from './brand.email.load';
 
 const LM = 'https://lm.acme.test';
 const LM2 = 'https://lm2.acme.test';
@@ -24,14 +25,14 @@ class Svc extends BrandEmailService {
   protected login(raw: string | null) { return JSON.parse(raw as string); }
 }
 
-type Opts = { role?: string; channels?: { id: string; name: string }[]; brief?: Record<string, unknown> | null; post?: boolean };
+type Opts = { raw?: string; role?: string; channels?: { id: string; name: string }[]; brief?: Record<string, unknown> | null; post?: boolean };
 const realFetch = globalThis.fetch;
 let calls: { url: string; init?: RequestInit }[] = [];
 let handler: (url: string, init?: RequestInit) => Response | Promise<Response>;
 
 function setup(opts: Opts = {}) {
   const channels = (opts.channels || [{ id: 'ch1', name: 'Acme email' }]).map((c, i) => ({
-    ...c, customInstanceDetails: JSON.stringify({ url: i === 0 ? LM : LM2, username: 'brand', password: 'pw' }),
+    ...c, customInstanceDetails: opts.raw ?? JSON.stringify({ url: i === 0 ? LM : LM2, username: 'brand', password: 'pw' }),
   }));
   const brands = { context: async () => ({ customer: { id: 'acc', name: 'Acme' }, role: opts.role || 'approve', channels: [] }) };
   const repo = {
@@ -62,6 +63,7 @@ function listmonk(over: { campaigns?: unknown[]; lists?: unknown[]; unsubs?: unk
       ] } });
     }
     if (u.pathname === '/api/campaigns/analytics/links') return json({ data: [{ url: 'https://acme.test/a', count: 2 }, { url: 'https://acme.test/b', count: 6 }] });
+    if (/^\/api\/campaigns\/\d+\/preview$/.test(u.pathname)) return new Response('<p>hi</p>', { headers: { 'content-type': 'text/html; charset=utf-8' } });
     if (u.pathname === '/api/import/subscribers') return json({ data: imports.length > 1 ? imports.shift() : imports[0] || { status: 'none' } });
     return json({}, 404);
   };
@@ -70,6 +72,7 @@ function listmonk(over: { campaigns?: unknown[]; lists?: unknown[]; unsubs?: unk
 beforeEach(() => {
   calls = [];
   clearRelayCache();
+  clearLoadCache();
   delete process.env.BREVO_API_KEY;
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => { calls.push({ url: String(input), init }); return handler(String(input), init); }) as typeof fetch;
 });
@@ -118,6 +121,7 @@ test('overview: with the key but no post, or a relay failure, the numbers fall b
   assert.equal(none.relay, 'brevo');
   assert.deepEqual(none.campaigns[0].opened, { count: 40, pct: 40 });
   clearRelayCache();
+  clearLoadCache();
   const lm = listmonk();
   handler = (url, init) => (url.includes('api.brevo.com') ? json({}, 500) : lm(url));
   const failed = await setup({ post: true }).overview(...args);
@@ -137,6 +141,7 @@ test('report: delivered, not delivered, links by clicks, history shows approved 
   assert.deepEqual(approved.links.map((l) => l.clicks), [6, 2]);
   assert.equal(approved.from, 'Acme <hello@acme.test>');
   clearRelayCache();
+  clearLoadCache();
   const sentBack = await setup({ post: true, brief: { review: 'SENT_BACK', sentById: 'u-sam', sentAt, decidedById: 'u-mona', decidedAt } }).report(...args, 'ch1', 1);
   assert.deepEqual(sentBack.history.map((h) => h.step), ['sent_for_review', 'sent', 'finished']);
   await assert.rejects(setup().report(...args, 'ch1', 99), NotFoundException);
@@ -174,7 +179,7 @@ test('import posts the list and the consent record, then polls until finished', 
   handler = listmonk({ import: [{ status: 'none' }, { status: 'importing' }, { status: 'importing' }, { status: 'finished', imported: 2 }] });
   const file = Buffer.from('email,name\nann@acme.test,Ann\nbob@acme.test,Bob\nann@acme.test,Ann again\n');
   const r = await setup().importContacts(...args, 'ch1', 7, { buffer: file }, true);
-  assert.deepEqual(r, { imported: 2, skipped: 1 });
+  assert.deepEqual(r, { processed: 2, skipped: 1 });
   const post = calls.find((x) => x.init?.method === 'POST')!;
   const form = post.init!.body as FormData;
   assert.deepEqual(JSON.parse(form.get('params') as string), { mode: 'subscribe', subscription_status: 'confirmed', delim: ',', lists: [7], overwrite: false });
@@ -182,6 +187,7 @@ test('import posts the list and the consent record, then polls until finished', 
   assert.match(csv, /ann@acme\.test/);
   assert.match(csv, /hub-import/);
   assert.match(csv, /Mona/);
+  assert.match(csv, /u-mona/);
 });
 
 test('import: refused while another import runs; a failed import is reported', async () => {
@@ -190,4 +196,81 @@ test('import: refused while another import runs; a failed import is reported', a
   assert.ok(!calls.some((x) => x.init?.method === 'POST'));
   handler = listmonk({ import: [{ status: 'none' }, { status: 'failed' }] });
   await assert.rejects(setup().importContacts(...args, 'ch1', 7, { buffer: Buffer.from('ann@acme.test') }, true), /import failed in the email engine/);
+});
+
+const own = (url: string) => new URL(url).pathname;
+const unsubRow = { lists: [{ id: 7, subscription_status: 'unsubscribed', subscription_updated_at: unsubAt }] };
+
+test('1: preview and report answer only for a campaign on the channel\'s own lists; the overview hides the others', async () => {
+  handler = listmonk({ campaigns: [campaign(), campaign({ id: 2, lists: [{ id: 7, name: 'x' }, { id: 99, name: 'Other brand' }] }), campaign({ id: 3, lists: [{ id: 99, name: 'Other brand' }] })] });
+  const s = setup();
+  assert.deepEqual((await s.overview(...args)).campaigns.map((c) => c.id), [1]);
+  assert.equal((await s.preview(...args, 'ch1', 1)).html, '<p>hi</p>');
+  for (const id of [2, 3, 50]) {
+    await assert.rejects(s.preview(...args, 'ch1', id), NotFoundException);
+    await assert.rejects(s.report(...args, 'ch1', id), NotFoundException);
+  }
+  assert.ok(!calls.some((x) => /\/campaigns\/(2|3|50)\/preview/.test(x.url)));
+});
+
+test('preview: only HTML answers are returned', async () => {
+  const lm = listmonk();
+  handler = (url) => (url.includes('/preview') ? new Response('{}', { headers: { 'content-type': 'application/json' } }) : lm(url));
+  await assert.rejects(setup().preview(...args, 'ch1', 1), (e: HttpException) => e.getStatus() === 502);
+});
+
+test('2: campaigns are read without bodies; unsubscribers page by page, at most 10 pages; one read serves two requests and the report', async () => {
+  const lm = listmonk({ lists: [list({ subscriber_statuses: { unsubscribed: 20000 } })] });
+  handler = (url, init) => (own(url) === '/api/subscribers'
+    ? json({ data: { results: Array.from({ length: 1000 }, () => unsubRow) } }) : lm(url));
+  const s = setup();
+  const [a, b] = await Promise.all([s.overview(...args), s.overview(...args)]);
+  assert.ok(calls.find((x) => own(x.url) === '/api/campaigns')!.url.includes('no_body=true'));
+  assert.equal(calls.filter((x) => own(x.url) === '/api/campaigns').length, 1);
+  assert.equal(calls.filter((x) => own(x.url) === '/api/subscribers').length, 10);
+  assert.ok(calls.filter((x) => own(x.url) === '/api/subscribers').every((x) => x.url.includes('per_page=1000')));
+  assert.equal(a.campaigns[0].unsubscribed?.count, 10000);
+  assert.equal(b.campaigns.length, 1);
+  await s.report(...args, 'ch1', 1);
+  assert.equal(calls.filter((x) => own(x.url) === '/api/campaigns').length, 1, 'report reuses the cached read');
+});
+
+test('5: a stored login that cannot be read is a 502, and the channel shows as failed', async () => {
+  handler = listmonk();
+  const s = setup({ raw: 'garbage' });
+  for (const run of [s.report(...args, 'ch1', 1), s.preview(...args, 'ch1', 1), s.contacts(...args, 'ch1', 7, 1)]) {
+    await assert.rejects(run, (e: HttpException) => e.getStatus() === 502);
+  }
+  assert.deepEqual((await s.overview(...args)).failed, ['Acme email']);
+});
+
+test('6: a failing unsubscribe read keeps the campaigns and lists; unsubscribed is unknown', async () => {
+  const lm = listmonk();
+  handler = (url) => (own(url) === '/api/subscribers' ? json({}, 500) : lm(url));
+  const o = await setup().overview(...args);
+  assert.deepEqual(o.failed, []);
+  assert.equal(o.lists.length, 1);
+  assert.deepEqual([o.campaigns[0].opened, o.campaigns[0].unsubscribed], [{ count: 40, pct: 40 }, null]);
+});
+
+test('8: Brevo: one call per tag at a time, at most 5 at once, nothing asked for emails older than 90 days', async () => {
+  process.env.BREVO_API_KEY = 'k';
+  let now = 0, max = 0, brevo = 0;
+  handler = async () => { brevo++; now++; max = Math.max(max, now); await new Promise((r) => setTimeout(r, 5)); now--; return json({ requests: 10, delivered: 9 }); };
+  const recent = new Date(Date.now() - DAY).toISOString();
+  const same = await Promise.all([relayReport('hub-a', recent), relayReport('hub-a', recent)]);
+  assert.equal(brevo, 1);
+  assert.equal(same[0]?.delivered, 9);
+  await Promise.all(Array.from({ length: 12 }, (_, i) => relayReport(`hub-t${i}`, recent)));
+  assert.ok(max <= 5 && max > 1, `max ${max}`);
+  const before = brevo;
+  assert.equal(await relayReport('hub-old', new Date(Date.now() - 100 * DAY).toISOString()), null);
+  assert.equal(brevo, before);
+  assert.ok(calls.find((x) => x.url.includes('tag=hub-a'))!.url.includes(`startDate=${new Date(Date.now() - 2 * DAY).toISOString().slice(0, 10)}`), 'window starts a day early');
+});
+
+test('11: the import answer is the people processed and the rows without a valid address', async () => {
+  handler = listmonk({ import: [{ status: 'none' }, { status: 'finished', imported: 2 }] });
+  const file = Buffer.from('email\nann@acme.test\nbob@acme.test\nnot-an-address\n');
+  assert.deepEqual(await setup().importContacts(...args, 'ch1', 7, { buffer: file }, true), { processed: 2, skipped: 1 });
 });

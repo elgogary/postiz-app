@@ -1,5 +1,9 @@
 // >>> SANAD-BRANDS: a brand's Email tab. Every method loads the brand with the caller's org first; contacts and import are for approvers.
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  BadRequestException, Body, CallHandler, Controller, ExecutionContext, Get, Injectable, NestInterceptor, Param, ParseIntPipe,
+  PayloadTooLargeException, Post, Query, UploadedFile, UseInterceptors,
+} from '@nestjs/common';
+import { catchError, throwError } from 'rxjs';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { Organization, User } from '@prisma/client';
@@ -7,6 +11,14 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { orgRoleOf } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandEmailService } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.service';
+
+// Multer answers 413 for a file over the limit; the tab shows a plain 400 with the reason.
+@Injectable()
+class FileTooLarge implements NestInterceptor {
+  intercept(_c: ExecutionContext, next: CallHandler) {
+    return next.handle().pipe(catchError((e) => throwError(() => (e instanceof PayloadTooLargeException ? new BadRequestException('The file is larger than 5 MB') : e))));
+  }
+}
 
 @ApiTags('Brands')
 @Controller('/brands')
@@ -37,7 +49,7 @@ export class BrandEmailController {
   }
 
   @Post('/:customerId/email/:channelId/lists/:listId/import')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileTooLarge, FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
   importContacts(@GetOrgFromRequest() org: Organization, @GetUserFromRequest() user: User, @Param('customerId') customerId: string,
     @Param('channelId') channelId: string, @Param('listId', ParseIntPipe) listId: number,
     @UploadedFile() file: Express.Multer.File, @Body('agreed') agreed?: string) {

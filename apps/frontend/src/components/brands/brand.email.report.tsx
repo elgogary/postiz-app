@@ -121,7 +121,7 @@ export const BrandEmailReport: FC<{ brandId: string; channelId: string; campaign
           <h3 className="text-[14px] font-[600] mb-[8px]">{t('email_history', 'History')}</h3>
           {rep.history.map((h, i) => (
             <div key={`${h.step}:${i}`} className="flex justify-between gap-[16px] py-[8px] border-t border-fifth first:border-t-0 first:pt-0">
-              <span>{t(STEP[h.step][0], STEP[h.step][1])}{h.by ? ` ${t('email_by', 'by')} ${h.by}` : ''}</span>
+              <span>{t(STEP[h.step][0], STEP[h.step][1])}{h.by && <> {t('email_by', 'by')} <Text text={h.by} /></>}</span>
               <span className="text-customColor18 text-[13px] whitespace-nowrap">{fmtAt(h.at)}</span>
             </div>
           ))}

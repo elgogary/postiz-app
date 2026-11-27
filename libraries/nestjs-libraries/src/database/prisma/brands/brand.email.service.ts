@@ -1,29 +1,27 @@
 // >>> SANAD-BRANDS: a brand's Email tab. Rights come from BrandsService.context (any member reads; contacts and import
 // are for approvers). Numbers come from the brand's own Listmonk and, when a relay key is set, the relay's report per email.
-import { BadRequestException, ForbiddenException, HttpException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
 import { BrandEmailRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.repository';
-import { Login, RelayReport, lmFetch, lmJson, relayOn, relayReport } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.engine';
+import { Login, RelayReport, lmFetch, lmJson, lmPreview, relayOn, relayReport, why } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.engine';
+import { LmCampaign, LmList, clearLoadCache, loadChannel } from '@gitroom/nestjs-libraries/database/prisma/brands/brand.email.load';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { OrgRole } from '@gitroom/helpers/brands/brand.rules';
 import {
   EmailCampaignRow, EmailContacts, EmailListRow, EmailOverview, EmailReport, HistoryStep, campaignIdFromRelease, campaignState,
-  consentOf, hubTag, listmonkImportCsv, rate, readContacts, unsubscribesByCampaign,
+  consentOf, hubTag, listmonkImportCsv, rate, readContacts,
 } from '@gitroom/helpers/brands/email.rules';
 
-type LmList = { id: number; name: string };
-type LmCampaign = {
-  id: number; name: string; subject: string; status: string; lists: LmList[]; started_at: string | null; updated_at: string;
-  send_at: string | null; sent: number; views: number; clicks: number; from_email?: string;
-};
 type Channel = { id: string; name: string; customInstanceDetails: string | null };
 type Relay = { postId: string; report: RelayReport | null };
 const MAX_FILE = 5 * 1024 * 1024;
 const PAGE = 50;
+const DOWN = 'The email engine did not answer';
 
 @Injectable()
 export class BrandEmailService {
   pollMs = 1000;
+  private readonly _log = new Logger('BrandEmailService');
   constructor(private _brands: BrandsService, private _repo: BrandEmailRepository) {}
 
   protected login(raw: string | null): Login {
@@ -33,33 +31,27 @@ export class BrandEmailService {
   private async engine<T>(run: () => Promise<T>): Promise<T> {
     try { return await run(); } catch (e) {
       if (e instanceof HttpException) throw e;
-      throw new HttpException('The email engine did not answer', 502);
+      this._log.warn(`Email engine failed: ${why(e)}`);
+      throw new HttpException(DOWN, 502);
+    }
+  }
+
+  // A stored login that cannot be read is the same 502 as an engine that does not answer.
+  private open(ch: Channel): Login {
+    try {
+      const l = this.login(ch.customInstanceDetails);
+      if (typeof l?.url !== 'string' || !/^https?:\/\//.test(l.url)) throw new Error('bad login');
+      return l;
+    } catch (e) {
+      this._log.warn(`Stored login unreadable: ${why(e)}`);
+      throw new HttpException(DOWN, 502);
     }
   }
 
   private async channel(orgId: string, customerId: string, channelId: string) {
     const ch = (await this._repo.emailChannels(orgId, customerId)).find((c) => c.id === channelId);
     if (!ch) throw new NotFoundException('Email channel not found');
-    return { ch, login: this.login(ch.customInstanceDetails) };
-  }
-
-  private async load(login: Login) {
-    const [c, l] = await Promise.all([
-      lmJson(login, '/api/campaigns?per_page=all&order_by=created_at&order=desc'), lmJson(login, '/api/lists?per_page=all'),
-    ]);
-    const campaigns: LmCampaign[] = c.data?.results || [];
-    const lists: (LmList & { tags?: string[]; subscriber_count?: number; subscriber_statuses?: Record<string, number> })[] = l.data?.results || [];
-    const withUnsubs = lists.filter((x) => (x.subscriber_statuses?.unsubscribed || 0) > 0);
-    const events = await Promise.all(withUnsubs.map(async (x) => {
-      const r = await lmJson(login, `/api/subscribers?list_id=${x.id}&subscription_status=unsubscribed&per_page=all`);
-      return ((r.data?.results || []) as { lists?: { id: number; subscription_status: string; subscription_updated_at: string }[] }[])
-        .flatMap((s) => (s.lists || []).filter((y) => y.id === x.id && y.subscription_status === 'unsubscribed')
-          .map((y) => ({ listId: x.id, at: y.subscription_updated_at })));
-    }));
-    const unsubs = unsubscribesByCampaign(
-      campaigns.map((k) => ({ id: k.id, listIds: (k.lists || []).map((y) => y.id), at: k.started_at })), events.flat(),
-    );
-    return { campaigns, lists, unsubs };
+    return { ch, login: this.open(ch) };
   }
 
   // The relay's report per started campaign, found through the Post the Hub made it from (tag hub-<postId>).
@@ -77,7 +69,7 @@ export class BrandEmailService {
     return out;
   }
 
-  private row(channelId: string, k: LmCampaign, unsubs: Map<number, number>, rep: RelayReport | null): EmailCampaignRow {
+  private row(channelId: string, k: LmCampaign, unsubs: Map<number, number> | null, rep: RelayReport | null): EmailCampaignRow {
     const state = campaignState(k.status);
     const at = state === 'sent' || state === 'sending' ? k.started_at : state === 'scheduled' ? k.send_at : k.updated_at;
     const sentTo = k.sent || 0;
@@ -87,7 +79,7 @@ export class BrandEmailService {
       channelId, id: k.id, name: k.name, subject: k.subject, state, at: at || k.updated_at || null, sentTo,
       opened: live ? (rep ? rate(rep.uniqueOpens, base) : rate(k.views || 0, sentTo)) : null,
       clicked: live ? (rep ? rate(rep.uniqueClicks, base) : rate(k.clicks || 0, sentTo)) : null,
-      unsubscribed: live ? rate(unsubs.get(k.id) || 0, base) : null,
+      unsubscribed: live && unsubs ? rate(unsubs.get(k.id) || 0, base) : null,
     };
   }
 
@@ -96,8 +88,8 @@ export class BrandEmailService {
     const channels = await this._repo.emailChannels(orgId, customerId);
     const done = await Promise.all(channels.map(async (ch) => {
       try {
-        const login = this.login(ch.customInstanceDetails);
-        const data = await this.load(login);
+        const login = this.open(ch);
+        const data = await loadChannel(ch.id, login);
         const relays = await this.relays(orgId, ch, login, data.campaigns);
         const campaigns = data.campaigns.map((k) => this.row(ch.id, k, data.unsubs, relays.get(k.id)?.report || null));
         const lists: EmailListRow[] = data.lists.map((x) => {
@@ -109,7 +101,8 @@ export class BrandEmailService {
           };
         });
         return { ch, campaigns, lists, ok: true };
-      } catch {
+      } catch (e) {
+        this._log.warn(`Overview of a channel failed: ${why(e)}`);
         return { ch, campaigns: [] as EmailCampaignRow[], lists: [] as EmailListRow[], ok: false };
       }
     }));
@@ -126,7 +119,7 @@ export class BrandEmailService {
     await this._brands.context(orgId, userId, orgRole, customerId);
     const { ch, login } = await this.channel(orgId, customerId, channelId);
     return this.engine(async () => {
-      const data = await this.load(login);
+      const data = await loadChannel(ch.id, login);
       const k = data.campaigns.find((x) => x.id === id);
       if (!k) throw new NotFoundException('Campaign not found');
       const relay = (await this.relays(orgId, ch, login, [k])).get(k.id);
@@ -144,7 +137,7 @@ export class BrandEmailService {
         { step: 'finished', by: null, at: k.status === 'finished' ? k.updated_at : null },
       ];
       return {
-        row: this.row(ch.id, k, data.unsubs, rep),
+        row: this.row(ch.id, k, (await loadChannel(ch.id, login)).unsubs, rep),
         from: k.from_email || '',
         lists: (k.lists || []).map((y) => ({ id: y.id, name: y.name })),
         delivered: rep ? rate(rep.delivered, rep.requests) : null,
@@ -159,8 +152,11 @@ export class BrandEmailService {
 
   async preview(orgId: string, userId: string, orgRole: OrgRole, customerId: string, channelId: string, id: number) {
     await this._brands.context(orgId, userId, orgRole, customerId);
-    const { login } = await this.channel(orgId, customerId, channelId);
-    return this.engine(async () => ({ html: await (await lmFetch(login, `/api/campaigns/${Number(id)}/preview`, { headers: { Accept: 'text/html' } })).text() }));
+    const { ch, login } = await this.channel(orgId, customerId, channelId);
+    return this.engine(async () => {
+      if (!(await loadChannel(ch.id, login)).campaigns.some((x) => x.id === id)) throw new NotFoundException('Campaign not found');
+      return { html: await lmPreview(login, id) };
+    });
   }
 
   private async approverList(orgId: string, userId: string, orgRole: OrgRole, customerId: string, channelId: string, listId: number) {
@@ -207,7 +203,7 @@ export class BrandEmailService {
     try { text = new TextDecoder('utf-8', { fatal: true }).decode(file.buffer); } catch { throw new BadRequestException('The file must be text in UTF-8'); }
     const parsed = readContacts(text);
     if (parsed.error) throw new BadRequestException(parsed.error);
-    const who = (await this._repo.userNames([userId])).get(userId) || userId;
+    const who = { id: userId, name: (await this._repo.userNames([userId])).get(userId) || userId };
     return this.engine(async () => {
       await this.mustHaveList(login, listId);
       const state = async () => (await lmJson(login, '/api/import/subscribers')).data || {};
@@ -215,14 +211,16 @@ export class BrandEmailService {
       const form = new FormData();
       form.append('params', JSON.stringify({ mode: 'subscribe', subscription_status: 'confirmed', delim: ',', lists: [listId], overwrite: false }));
       form.append('file', new Blob([listmonkImportCsv(parsed.contacts, who, new Date().toISOString())], { type: 'text/csv' }), 'contacts.csv');
+      clearLoadCache(channelId);
       await lmFetch(login, '/api/import/subscribers', { method: 'POST', body: form });
       for (let i = 0; i < 30; i++) {
         await new Promise((r) => setTimeout(r, this.pollMs));
         const s = await state();
         if (s.status === 'failed') throw new BadRequestException('The import failed in the email engine');
         if (s.status === 'finished') {
-          const imported = Number(s.imported) || 0;
-          return { imported, skipped: parsed.skipped + Math.max(0, parsed.contacts.length - imported) };
+          clearLoadCache(channelId);
+          // Listmonk's imported counts every person it processed, new or already on the list, so the two cannot be told apart.
+          return { processed: Number(s.imported) || 0, skipped: parsed.skipped };
         }
       }
       throw new BadRequestException('The import is still running, check the list in a minute');

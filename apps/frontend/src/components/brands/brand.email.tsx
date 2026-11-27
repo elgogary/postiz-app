@@ -42,17 +42,18 @@ export const BrandEmail: FC<{
 
   useEffect(() => { setData(null); load(); return () => { seq.current += 1; }; }, [load]);
 
+  // A deep link to a campaign shows its own report at once; it does not wait for the overview.
+  const [kind, channelId, rawId] = focus.split(':');
+  if (kind === 'c' && channelId && +rawId) {
+    return <BrandEmailReport brandId={brandId} channelId={channelId} campaignId={+rawId} go={go} />;
+  }
   if (error && !data) return <Retry text={error} onRetry={load} />;
   if (!data) return <Skeleton />;
 
   const names = new Set(data.channels.map((c) => c.name));
   const unsent = (posts?.cards || []).filter((c) => names.has(c.channel) && c.state !== 'published' && c.state !== 'planned');
   const total = unsent.length + data.campaigns.length;
-  const [kind, channelId, rawId] = focus.split(':');
 
-  if (kind === 'c' && channelId && +rawId) {
-    return <BrandEmailReport brandId={brandId} channelId={channelId} campaignId={+rawId} go={go} />;
-  }
   if (filter === 'lists' || kind === 'l') {
     return <BrandEmailLists brandId={brandId} brandName={brandName} role={role} data={data} campaigns={total}
       list={kind === 'l' && channelId && +rawId ? { channelId, id: +rawId } : null} go={go} onChanged={load} />;

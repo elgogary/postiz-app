@@ -111,7 +111,7 @@ export const useBrandsApi = () => {
       const form = new FormData();
       form.append('file', file);
       form.append('agreed', 'true');
-      return upload(`/brands/${id}/email/${channelId}/lists/${listId}/import`, form) as Promise<{ imported: number; skipped: number }>;
+      return upload(`/brands/${id}/email/${channelId}/lists/${listId}/import`, form) as Promise<{ processed: number; skipped: number }>;
     },
   }), [send, upload]);
 };

@@ -24,7 +24,7 @@ export const BrandEmailLists: FC<{
   const modals = useModals();
   const approver = role === 'approve';
   const open = list && approver ? data.lists.find((l) => l.channelId === list.channelId && l.id === list.id) : null;
-  if (open) return <EmailContactsView brandId={brandId} list={open} go={go} />;
+  if (open) return <EmailContactsView key={`${open.channelId}:${open.id}`} brandId={brandId} list={open} go={go} />;
 
   return (
     <div className="flex flex-col gap-[16px]">
