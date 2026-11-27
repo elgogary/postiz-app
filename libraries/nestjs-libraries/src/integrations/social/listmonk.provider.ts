@@ -1,5 +1,5 @@
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { SocialAbstract } from '../social.abstract';
+import { BadBody, SocialAbstract } from '../social.abstract';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -253,7 +253,8 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
       })
     ).json();
     if (consentOf(target?.data?.tags) === 'none') {
-      throw new Error('This list has no recorded agreement to hear from the brand, so nothing was sent');
+      throw new BadBody('listmonk', JSON.stringify({ list: postDetails[0].settings.list }), '',
+        'This list has no recorded agreement to hear from the brand, so nothing was sent');
     }
     // <<< SANAD-BRANDS
 

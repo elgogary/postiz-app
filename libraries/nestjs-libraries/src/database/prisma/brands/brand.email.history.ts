@@ -81,7 +81,10 @@ export async function readBrevoCampaign(id: number, map: Map<number, number>, ow
   }
 }
 
-export const historyCampaignRow = (h: HistoryRow): EmailCampaignRow => ({
+// the fields the campaigns list reads (the repository's history() selects only these)
+export type HistoryListRow = Pick<HistoryRow, 'sourceId' | 'name' | 'subject' | 'sentAt' | 'listIds' | 'sent' | 'delivered' | 'opens' | 'clicks' | 'unsubscribed'>;
+
+export const historyCampaignRow = (h: HistoryListRow): EmailCampaignRow => ({
   channelId: HISTORY_CHANNEL, id: Number(h.sourceId), name: h.name, subject: h.subject, state: 'sent', at: h.sentAt.toISOString(), sentTo: h.sent,
   opened: rate(h.opens, h.delivered), clicked: rate(h.clicks, h.delivered), unsubscribed: rate(h.unsubscribed, h.delivered),
 });

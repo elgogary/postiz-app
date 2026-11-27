@@ -28,6 +28,7 @@ function setup(channels = true) {
     postsByRelease: async () => [], briefsByPost: async () => [], userNames: async () => new Map(),
     history: async (o: string, c: string) => store.filter((h) => h.orgId === o && h.customerId === c).sort((a, b) => +b.sentAt - +a.sentAt),
     historyOne: async (o: string, c: string, id: string) => store.find((h) => h.orgId === o && h.customerId === c && h.sourceId === id) || null,
+    historyAnyBrand: async (o: string, id: string) => store.find((h) => h.orgId === o && h.sourceId === id) || null,
     saveHistory: async (o: string, c: string, by: string, h: Record<string, any>) => {
       const i = store.findIndex((x) => x.orgId === o && x.sourceId === h.sourceId);
       const row = { ...h, orgId: o, customerId: c, importedById: by };
@@ -72,10 +73,11 @@ beforeEach(() => {
   calls = []; store = [];
   clearRelayCache(); clearLoadCache();
   process.env.BREVO_API_KEY = 'secret-key';
+  process.env.BREVO_ORG_ID = 'org';
   handler = remote();
   globalThis.fetch = (async (input: string | URL) => { calls.push(String(input)); return handler(String(input)); }) as typeof fetch;
 });
-afterEach(() => { globalThis.fetch = realFetch; delete process.env.BREVO_API_KEY; });
+afterEach(() => { globalThis.fetch = realFetch; delete process.env.BREVO_API_KEY; delete process.env.BREVO_ORG_ID; });
 
 test('import: org admin only, and nothing is read from Brevo for anyone else', async () => {
   await assert.rejects(setup().importHistory(...user, [6], { 5: 21 }), ForbiddenException);
@@ -158,4 +160,20 @@ test('report and preview for a history campaign come from the table, for any mem
   await assert.rejects(s.preview(...user, 'history', 99), NotFoundException);
   store[0].customerId = 'other';
   await assert.rejects(s.report(...user, 'history', 6), NotFoundException);
+});
+
+test('import: only the organization that owns the relay account may bring campaigns over', async () => {
+  const s = setup();
+  const other = ['org-b', 'u-9', 'ADMIN', 'acc'] as const;
+  await assert.rejects(s.importHistory(...other, [6], {}), (e: any) => e.getStatus() === 403);
+  delete process.env.BREVO_ORG_ID;
+  await assert.rejects(s.importHistory(...admin, [6], {}), (e: any) => e.getStatus() === 403);
+  assert.equal(calls.filter((u) => u.includes('brevo')).length, 0, 'no Brevo call for a refused import');
+});
+
+test('import: a campaign already brought over for another brand is not moved', async () => {
+  const s = setup();
+  store.push({ orgId: 'org', customerId: 'other-brand', source: 'brevo', sourceId: '6', sentAt: new Date() });
+  await assert.rejects(s.importHistory(...admin, [6], {}), (e: any) => e.getStatus() === 400);
+  assert.equal(store.find((h) => h.sourceId === '6')!.customerId, 'other-brand');
 });

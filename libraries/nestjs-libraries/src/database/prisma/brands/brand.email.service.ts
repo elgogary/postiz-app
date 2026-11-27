@@ -87,7 +87,10 @@ export class BrandEmailService {
   async overview(orgId: string, userId: string, orgRole: OrgRole, customerId: string): Promise<EmailOverview> {
     await this._brands.context(orgId, userId, orgRole, customerId);
     const channels = await this._repo.emailChannels(orgId, customerId);
-    const history = await this._repo.history(orgId, customerId);
+    const history = await this._repo.history(orgId, customerId).catch((e) => {
+      this._log.warn(`Earlier campaigns not read: ${why(e)}`);
+      return [];
+    });
     const done = await Promise.all(channels.map(async (ch) => {
       try {
         const login = this.open(ch);
@@ -175,6 +178,9 @@ export class BrandEmailService {
   async importHistory(orgId: string, userId: string, orgRole: OrgRole, customerId: string, campaignIds: unknown, listMap: unknown) {
     await this._brands.context(orgId, userId, orgRole, customerId);
     if (!isOrgAdmin(orgRole)) throw new ForbiddenException('Only an admin can bring over earlier campaigns');
+    // the relay key belongs to one account: only the organization that owns it may read its campaigns
+    const owner = process.env.BREVO_ORG_ID && process.env.BREVO_ORG_ID.length > 0 ? process.env.BREVO_ORG_ID : null;
+    if (owner !== orgId) throw new ForbiddenException('The sending relay account on this server belongs to another organization');
     const { ids, map } = checkImportBody(campaignIds, listMap);
     const own = new Set<number>();
     for (const ch of await this._repo.emailChannels(orgId, customerId)) {
@@ -188,6 +194,10 @@ export class BrandEmailService {
     const names = new Map<number, string>();
     const rows: HistoryInput[] = [];
     for (const id of ids) rows.push(await readBrevoCampaign(id, map, own, names));
+    for (const r of rows) {
+      const had = await this._repo.historyAnyBrand(orgId, r.sourceId);
+      if (had && had.customerId !== customerId) throw new BadRequestException(`Campaign ${r.sourceId} was already brought over for another brand`);
+    }
     for (const r of rows) await this._repo.saveHistory(orgId, customerId, userId, r);
     return { imported: rows.length, campaigns: rows.map((r) => ({ id: Number(r.sourceId), name: r.name })) };
   }
