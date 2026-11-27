@@ -7,6 +7,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
 import { runWithContext } from './async.storage';
 import { createOAuthMiddleware } from './oauth-middleware';
+import { resolveMcpIdentity } from './mcp.identity';
 const fixAcceptHeader = (req: Request) => {
   const value = 'application/json, text/event-stream';
   req.headers.accept = value;
@@ -23,14 +24,12 @@ export const startMcp = async (app: INestApplication) => {
   const organizationService = app.get(OrganizationService, { strict: false });
   const oauthService = app.get(OAuthService, { strict: false });
 
-  const resolveAuth = async (token: string) => {
-    if (token.startsWith('pos_')) {
-      const authorization = await oauthService.getOrgByOAuthToken(token);
-      if (!authorization) return null;
-      return authorization.organization;
-    }
-    return organizationService.getOrgByApiKey(token);
-  };
+  // SANAD-BRANDS: the organisation, and for a person's OAuth token also the person and their role
+  const resolveAuth = (token: string) => resolveMcpIdentity(token, {
+    byOAuthToken: (t) => oauthService.getOrgByOAuthToken(t),
+    byApiKey: (k) => organizationService.getOrgByApiKey(k),
+    orgsOfUser: (userId) => organizationService.getOrgsByUserId(userId),
+  });
 
   const mastra = await mastraService.mastra();
   const agent = mastra.getAgent('postiz');
@@ -47,11 +46,11 @@ export const startMcp = async (app: INestApplication) => {
 
   const oauthMiddleware = createOAuthMiddleware({
     oauth: {
-      resource: new URL('/mcp-oauth', process.env.NEXT_PUBLIC_BACKEND_URL!).toString(),
+      resource: `${process.env.NEXT_PUBLIC_BACKEND_URL}/mcp-oauth`, // SANAD-BRANDS: keeps a path in the backend URL (/api)
       authorizationServers: [process.env.NEXT_PUBLIC_BACKEND_URL!],
       validateToken: async (token: string) => {
-        const org = await resolveAuth(token);
-        if (!org) {
+        const who = await resolveAuth(token);
+        if (!who) {
           return { valid: false, error: 'invalid_token', errorDescription: 'Invalid API Key or OAuth token' };
         }
         return { valid: true, subject: token };
@@ -107,14 +106,14 @@ export const startMcp = async (app: INestApplication) => {
     if (!result.proceed) return;
 
     const token = result.tokenValidation?.subject;
-    const auth = await resolveAuth(token!);
-    if (!auth) {
+    const who = await resolveAuth(token!);
+    if (!who) {
       res.status(401).json({ error: 'invalid_token', error_description: 'Could not resolve organization' });
       return;
     }
 
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token!, auth }, async () => {
+    await runWithContext({ requestId: token!, auth: who.org, user: who.user }, async () => {
       await server.startHTTP({
         url: url,
         httpPath: url.pathname,
@@ -154,8 +153,9 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
+    const who = await resolveAuth(token);
     // @ts-ignore
-    req.auth = await resolveAuth(token);
+    req.auth = who?.org;
     // @ts-ignore
     if (!req.auth) {
       res.status(401).send('Invalid API Key or OAuth token');
@@ -166,7 +166,7 @@ export const startMcp = async (app: INestApplication) => {
 
     fixAcceptHeader(req);
     // @ts-ignore
-    await runWithContext({ requestId: token, auth: req.auth }, async () => {
+    await runWithContext({ requestId: token, auth: req.auth, user: who?.user }, async () => {
       await server.startHTTP({
         url,
         httpPath: url.pathname,
