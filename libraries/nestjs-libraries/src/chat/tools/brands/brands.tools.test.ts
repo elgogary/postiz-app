@@ -12,9 +12,9 @@ const BRANDS = [{ id: 'b-1', name: 'Accurate Systems', role: 'create', requiresA
 
 const calls: unknown[][] = [];
 const rec = (name: string, out: unknown = { ok: true }) => async (...args: unknown[]) => { calls.push([name, ...args]); return out; };
-const brands = { list: rec('list', BRANDS), get: rec('get', { sections: { voice: { content: '<h3>Tone</h3><p>Plain &amp; warm</p>' } } }) } as any;
+const brands = { list: rec('list', BRANDS), get: rec('get', { sections: { voice: { content: '<h3>Tone</h3><p>Plain &amp; warm</p>' }, review: { rows: [['No client names'], ['Numbers have a source']] } } }) } as any;
 const review = {
-  cards: rec('cards', { checks: ['own words', 'brand list'], cards: [{ briefId: 'br-9', postId: 'p-9', state: 'draft' }] }),
+  cards: rec('cards', { checks: 2, cards: [{ briefId: 'br-9', postId: 'p-9', state: 'draft', verify: ' Check the ZATCA date ' }] }),
   sendForReview: rec('sendForReview'), approve: rec('approve'), sendBack: rec('sendBack'), stop: rec('stop'), addComment: rec('addComment', { id: 'c-1' }),
 } as any;
 const ideas = { plan: rec('plan', { briefId: 'br-9', firstDraft: true, aiFailed: false, noChannel: false }) } as any;
@@ -43,7 +43,8 @@ test('brand_hub finds the brand by name in any case and returns the voice as pla
   const out = await asPerson(() => exec(new BrandHubTool(brands, review), { brand: 'accurate   systems' }));
   assert.equal(out.id, 'b-1');
   assert.equal(out.voice, 'Tone\nPlain & warm');
-  assert.deepEqual(out.checksBeforeApproving, ['own words', 'brand list']);
+  assert.deepEqual(out.beforePublishing, ['No client names', 'Numbers have a source']);
+  assert.equal(out.posts[0].verify, 'Check the ZATCA date');
 });
 
 test('draft_from_idea plans with the AI draft, then sends the new post for review', async () => {
@@ -60,7 +61,7 @@ test('draft_from_idea plans with the AI draft, then sends the new post for revie
 test('review_post: approve needs both checks confirmed; send back needs a reason; stop goes straight through', async () => {
   calls.length = 0;
   const tool = new ReviewPostTool(brands, review);
-  assert.match((await asPerson(() => exec(tool, { brand: 'b-1', postId: 'p-9', action: 'approve', confirmedOwnCheck: true }))).error, /both checks/);
+  assert.match((await asPerson(() => exec(tool, { brand: 'b-1', postId: 'p-9', action: 'approve', confirmedOwnCheck: true }))).error, /confirm both/);
   assert.match((await asPerson(() => exec(tool, { brand: 'b-1', postId: 'p-9', action: 'send_back', reason: '  ' }))).error, /reason/);
   assert.equal(called('approve').length + called('sendBack').length, 0);
   await asPerson(() => exec(tool, { brand: 'b-1', postId: 'p-9', action: 'approve', confirmedOwnCheck: true, confirmedListCheck: true }));

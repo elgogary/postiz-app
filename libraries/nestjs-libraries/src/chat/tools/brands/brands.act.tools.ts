@@ -110,14 +110,14 @@ export class ReviewPostTool implements AgentToolInterface {
     return createTool({
       id: 'review_post',
       description: `Decide on a post waiting for review: approve, send back with a reason, or stop. Needs the Approve `
-        + `right. ${ONLY_THE_PERSON} Before approving, ask the person to confirm both checks from brand_hub `
-        + `(checksBeforeApproving) and pass both as true.`,
+        + `right. ${ONLY_THE_PERSON} Before approving, show the person the post's own check (verify, from brand_hub) `
+        + `and the brand's Before publishing list, and pass both as true only after they confirm each.`,
       inputSchema: z.object({
         brand: BRAND, postId: POST,
         action: z.enum(['approve', 'send_back', 'stop']),
         reason: z.string().max(1000).optional().describe('Required to send back: what to change'),
-        confirmedOwnCheck: z.boolean().optional().describe('Approve only: the person confirmed the first check'),
-        confirmedListCheck: z.boolean().optional().describe("Approve only: the person confirmed the brand's list"),
+        confirmedOwnCheck: z.boolean().optional().describe("Approve only: the person confirmed the post's own check (verify)"),
+        confirmedListCheck: z.boolean().optional().describe("Approve only: the person confirmed the brand's Before publishing list"),
       }),
       mcp: { annotations: { title: 'Approve, send back or stop', ...WRITE, destructiveHint: true } },
       execute: async (input) => answer(async () => {
@@ -129,7 +129,8 @@ export class ReviewPostTool implements AgentToolInterface {
         }
         if (input.action === 'stop') return this._review.stop(p.orgId, p.userId, p.role, b.id, input.postId);
         if (input.confirmedOwnCheck !== true || input.confirmedListCheck !== true) {
-          throw new Refusal('Not approved: ask the person to confirm both checks (checksBeforeApproving in brand_hub) first');
+          throw new Refusal("Not approved: show the person the post's own check (verify) and the brand's Before publishing "
+            + 'list from brand_hub, and approve only after they confirm both');
         }
         return this._review.approve(p.orgId, p.userId, p.role, b.id, input.postId, { own: true, list: true });
       }),

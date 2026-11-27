@@ -46,8 +46,9 @@ export class BrandHubTool implements AgentToolInterface {
   run() {
     return createTool({
       id: 'brand_hub',
-      description: `One brand's hub: its summary, voice and focus weeks, the checks an approver confirms, and its posts `
-        + `with their state (${STATES}), who sent and who decided, and the last comment.`,
+      description: `One brand's hub: its summary, voice and focus weeks, its Before publishing list, and its posts `
+        + `with their state (${STATES}), who sent and who decided, the last comment, and the post's own check to `
+        + `confirm before approving (verify).`,
       inputSchema: z.object({ brand: BRAND }),
       mcp: { annotations: { title: 'Brand hub', ...READ } },
       execute: async (input) => answer(async () => {
@@ -61,10 +62,11 @@ export class BrandHubTool implements AgentToolInterface {
           brand: b.name, id: b.id, yourRole: b.role, requiresApproval: b.requiresApproval,
           summary: plain(sections.summary?.content), voice: plain(sections.voice?.content, 3000),
           focus: (sections.focus?.rows || []).map(([from, to, title, desc]) => ({ from, to, title, desc })),
-          checksBeforeApproving: board.checks,
+          beforePublishing: (sections.review?.rows || []).map(([item]) => item),
           posts: board.cards.map((c) => ({
             postId: c.postId, briefId: c.briefId, date: c.date, state: c.state, format: c.format, title: c.title,
             channel: c.channel, sentBy: c.sentBy, decidedBy: c.decidedBy, comments: c.comments, lastNote: c.lastNote,
+            verify: c.verify.trim() || null,
           })),
         };
       }),
