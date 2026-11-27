@@ -1,7 +1,7 @@
 // Run inside the image: docker run --rm --entrypoint sh <image> -c "cd /app && npx -y tsx@4.19.2 --test libraries/nestjs-libraries/src/database/prisma/brands/brand.review.service.test.ts"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { BrandReviewService } from './brand.review.service';
 
 const FUTURE = new Date(Date.now() + 5 * 86400000);
@@ -9,9 +9,10 @@ const PAST = new Date(Date.now() - 86400000);
 
 function setup(opts: {
   role?: 'view' | 'create' | 'approve'; approval?: boolean; state?: string; image?: unknown[]; date?: Date;
-  brief?: Record<string, unknown> | null; postFound?: boolean;
+  brief?: Record<string, unknown> | null; postFound?: boolean; orphan?: { state: string; deletedAt: Date | null } | null;
 }) {
   const calls: unknown[][] = [];
+  let claimed = 0;
   const brief = opts.brief === null ? null : {
     id: 'b1', postId: 'p1', plannedAt: FUTURE, format: 'Text', goal: '', pillars: [], title: 'T', sub: '', caption: 'Hello',
     slidesLabel: '', slides: [], visual: '', imagePrompt: '', why: '', verify: '', firstDraft: false, review: 'NONE',
@@ -35,7 +36,8 @@ function setup(opts: {
     addComment: async (o: string, p: string, u: string, text: string) => { calls.push(['addComment', p, u, text]); return { id: 'cm1' }; },
     comments: async () => [{ id: 'cm1', content: 'Fix slide 2', userId: 'u2', createdAt: new Date() }],
     names: async () => ({ u2: 'Owner' }),
-    deleteBrief: async (id: string) => { calls.push(['deleteBrief', id]); return {}; },
+    postAnywhere: async () => (opts.orphan ? { id: 'p1', group: 'g1', ...opts.orphan } : null),
+    deleteUnplanned: async (o: string, id: string) => { calls.push(['deleteBrief', id]); return claimed++ === 0 ? 1 : 0; },
   };
   const posts = {
     changePostStatus: async (...a: unknown[]) => { calls.push(['changePostStatus', ...a]); return {}; },
@@ -131,13 +133,13 @@ test('a published poll is not marked published again', async () => {
 test('un-plan deletes the draft, releases the idea and deletes the brief, last', async () => {
   const { svc, calls } = setup({ role: 'create', brief: { ideaId: 'i9' } });
   assert.deepEqual(await svc.unplan(...args, 'b1'), { ok: true });
-  assert.deepEqual(calls, [['deletePost', 'o', 'g1'], ['release', 'o', 'i9', 'b1'], ['deleteBrief', 'b1']]);
+  assert.deepEqual(calls, [['deleteBrief', 'b1'], ['release', 'o', 'i9', 'b1'], ['deletePost', 'o', 'g1']]);
 });
 
 test('un-plan of a planned post with no draft only releases the idea and deletes the brief', async () => {
   const { svc, calls } = setup({ role: 'approve', brief: { ideaId: 'i9', postId: null } });
   await svc.unplan(...args, 'b1');
-  assert.deepEqual(calls, [['release', 'o', 'i9', 'b1'], ['deleteBrief', 'b1']]);
+  assert.deepEqual(calls, [['deleteBrief', 'b1'], ['release', 'o', 'i9', 'b1']]);
 });
 
 test('un-plan is refused: viewer, plan-imported brief, sent for review, scheduled post, unknown brief', async () => {
@@ -150,4 +152,26 @@ test('un-plan is refused: viewer, plan-imported brief, sent for review, schedule
   }
   await assert.rejects(setup({ role: 'create', state: 'QUEUE', brief: { ideaId: 'i9' } }).svc.unplan(...args, 'b1'), BadRequestException);
   await assert.rejects(setup({ role: 'create', brief: null }).svc.unplan(...args, 'b1'), NotFoundException);
+});
+
+test('un-plan refuses a live post that is off the brand channels, and removes a draft that is', async () => {
+  for (const state of ['QUEUE', 'PUBLISHED', 'ERROR']) {
+    const s = setup({ role: 'create', postFound: false, orphan: { state, deletedAt: null }, brief: { ideaId: 'i9' } });
+    await assert.rejects(s.svc.unplan(...args, 'b1'), BadRequestException);
+    assert.deepEqual(s.calls, []);
+  }
+  const gone = setup({ role: 'create', postFound: false, orphan: { state: 'QUEUE', deletedAt: new Date() }, brief: { ideaId: 'i9' } });
+  assert.deepEqual(await gone.svc.unplan(...args, 'b1'), { ok: true });
+  assert.deepEqual(gone.calls, [['deleteBrief', 'b1'], ['release', 'o', 'i9', 'b1']]);
+  const draft = setup({ role: 'create', postFound: false, orphan: { state: 'DRAFT', deletedAt: null }, brief: { ideaId: 'i9' } });
+  await draft.svc.unplan(...args, 'b1');
+  assert.deepEqual(draft.calls.at(-1), ['deletePost', 'o', 'g1']);
+});
+
+test('un-plan called twice: the second gets a 409 and deletes nothing', async () => {
+  const { svc, calls } = setup({ role: 'create', brief: { ideaId: 'i9' } });
+  await svc.unplan(...args, 'b1');
+  const before = calls.length;
+  await assert.rejects(svc.unplan(...args, 'b1'), ConflictException);
+  assert.deepEqual(calls.slice(before), [['deleteBrief', 'b1']]);
 });

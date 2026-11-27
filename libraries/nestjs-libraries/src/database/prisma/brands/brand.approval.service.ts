@@ -48,7 +48,7 @@ export class BrandApprovalService {
   // back to review (its brief) and to Draft (the caller saves it as a draft). No editor (API key, MCP) cannot be an
   // approver. Returns the posts to hold back; putInReview records them once the save has worked.
   async editsNeedingReview(orgId: string, editor: Editor | undefined, postIds: string[]): Promise<{ postId: string; briefId: string }[]> {
-    const ids = [...new Set(postIds.filter(Boolean))];
+    const ids = await this.withRoots(orgId, [...new Set(postIds.filter(Boolean))]);
     if (!ids.length) return [];
     const briefs = await this._prisma.model.postBrief.findMany({
       where: { orgId, postId: { in: ids }, review: 'APPROVED' }, select: { id: true, postId: true, customerId: true },
@@ -73,6 +73,20 @@ export class BrandApprovalService {
     return open
       .filter((b) => !off.has(b.customerId) && !(editor && resolveBrandRole(editor.orgRole, roleOf.get(b.customerId)) === 'approve'))
       .map((b) => ({ postId: b.postId as string, briefId: b.id }));
+  }
+
+  // A thread child id stands for its root: the brief and the approval belong to the root. Ids are followed up a few levels.
+  private async withRoots(orgId: string, ids: string[]): Promise<string[]> {
+    const all = new Set(ids);
+    let todo = ids;
+    for (let i = 0; i < 5 && todo.length; i++) {
+      const rows = await this._prisma.model.post.findMany({
+        where: { id: { in: todo }, organizationId: orgId, parentPostId: { not: null } }, select: { parentPostId: true },
+      });
+      todo = rows.map((r) => r.parentPostId).filter((x): x is string => !!x && !all.has(x));
+      todo.forEach((x) => all.add(x));
+    }
+    return [...all];
   }
 
   async putInReview(briefIds: string[], editor: Editor | undefined) {

@@ -49,6 +49,13 @@ export class BrandPostsRepository {
     });
   }
 
+  // Any post of the organization, whatever its channel or state (a brief's post can be on a channel moved off the brand).
+  postAnywhere(orgId: string, id: string) {
+    return this._prisma.model.post.findFirst({
+      where: { id, organizationId: orgId }, select: { id: true, group: true, state: true, deletedAt: true },
+    });
+  }
+
   lastNotes(postIds: string[]) {
     if (!postIds.length) return Promise.resolve([]);
     return this._prisma.model.comments.findMany({
@@ -94,8 +101,9 @@ export class BrandPostsRepository {
     return this._prisma.model.postBrief.update({ where: { id }, data });
   }
 
-  deleteBrief(id: string) {
-    return this._prisma.model.postBrief.delete({ where: { id } });
+  // Un-plan: deletes only a brief still untouched by review; the count says whether this call won (1) or lost a race (0).
+  async deleteUnplanned(orgId: string, id: string) {
+    return (await this._prisma.model.postBrief.deleteMany({ where: { id, orgId, review: 'NONE', ideaId: { not: null } } })).count;
   }
 
   // Only briefs whose post still exists wait on someone: a post deleted in Postiz leaves its brief behind.

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   ValidationPipe,
 } from '@nestjs/common';
@@ -697,6 +698,23 @@ export class PostsService {
     return this._postRepository.getPostByForWebhookId(id);
   }
 
+  // >>> SANAD-BRANDS: the publish workflow never re-checks the post, so a held post stays safe only if its workflow ends.
+  // Unlike startWorkflow, an error here must reach the caller: the post is not saved while it could still publish.
+  async terminateWorkflows(postId: string) {
+    try {
+      const workflows = this._temporalService.client
+        .getRawClient()
+        .workflow.list({ query: `postId="${postId}" AND ExecutionStatus="Running"` });
+      for await (const executionInfo of workflows) {
+        const workflow = await this._temporalService.client.getWorkflowHandle(executionInfo.workflowId);
+        if ((await workflow.describe()).status.name !== 'TERMINATED') await workflow.terminate();
+      }
+    } catch (err) {
+      throw new HttpException('Could not unschedule this approved post; try again', 503);
+    }
+  }
+  // <<< SANAD-BRANDS
+
   async startWorkflow(
     taskQueue: string,
     postId: string,
@@ -897,13 +915,21 @@ export class PostsService {
       ]), { allowPublished: body.type === 'update' });
     }
     // Editing an approved post sends it back to review (see BrandApprovalService.editsNeedingReview).
-    const held = await this._brandApproval.editsNeedingReview(orgId, editor, body.posts.map((p) => p.value?.[0]?.id || ''));
-    const heldIds = new Set(held.map((h) => h.postId));
+    // Every item id of a post is checked, so a thread child id cannot carry the approved root past the check.
+    const heldOf = new Map<any, { postId: string; briefId: string }[]>();
+    for (const p of body.posts) {
+      heldOf.set(p, await this._brandApproval.editsNeedingReview(orgId, editor, (p.value || []).map((v) => v.id || '')));
+    }
     // <<< SANAD-BRANDS
     const postList = [];
     for (const post of body.posts) {
       // >>> SANAD-BRANDS
-      const holdBack = heldIds.has(post.value?.[0]?.id || '');
+      const held = heldOf.get(post) || [];
+      const holdBack = held.length > 0;
+      // Stop the publish workflow before anything is saved; if that fails the post stays as it was.
+      if (holdBack) {
+        for (const h of held) await this.terminateWorkflows(h.postId);
+      }
       // <<< SANAD-BRANDS
       const provider = this._integrationManager.getSocialIntegration(
         (post.settings as any)?.__type
@@ -943,10 +969,10 @@ export class PostsService {
 
       // >>> SANAD-BRANDS
       if (holdBack) {
-        await this._brandApproval.putInReview(held.filter((h) => h.postId === post.value?.[0]?.id).map((h) => h.briefId), editor);
+        await this._brandApproval.putInReview(held.map((h) => h.briefId), editor);
       }
       // <<< SANAD-BRANDS
-      if (body.type !== 'update' || holdBack) {
+      if (body.type !== 'update' && !holdBack) {
         this.startWorkflow(
           post.settings.__type.split('-')[0].toLowerCase(),
           posts[0].id,
@@ -1023,6 +1049,17 @@ export class PostsService {
     }
     // <<< SANAD-BRANDS
 
+    // >>> SANAD-BRANDS: moving an approved post sends it back to review, like any other edit. Decided before any write:
+    // the workflow is ended first (failing loudly), then the date and DRAFT are written together.
+    const held = await this._brandApproval.editsNeedingReview(orgId, editor, [id]);
+    if (held.length) {
+      await this.terminateWorkflows(id);
+      const heldDate = await this._postRepository.changeDate(orgId, id, date, true, action, true);
+      await this._brandApproval.putInReview(held.map((h) => h.briefId), editor);
+      return heldDate;
+    }
+    // <<< SANAD-BRANDS
+
     // schedule: Set status to QUEUE and change date (reschedule the post)
     // update: Just change the date without changing the status
     const newDate = await this._postRepository.changeDate(
@@ -1032,18 +1069,6 @@ export class PostsService {
       getPostById.state === 'DRAFT',
       action
     );
-
-    // >>> SANAD-BRANDS: moving an approved post sends it back to review, like any other edit
-    const held = await this._brandApproval.editsNeedingReview(orgId, editor, [id]);
-    if (held.length) {
-      await this._postRepository.changeState(id, 'DRAFT');
-      await this._brandApproval.putInReview(held.map((h) => h.briefId), editor);
-      try {
-        await this.startWorkflow(getPostById.integration.providerIdentifier.split('-')[0].toLowerCase(), id, orgId, 'DRAFT');
-      } catch (err) {}
-      return newDate;
-    }
-    // <<< SANAD-BRANDS
 
     if (action === 'schedule') {
       try {

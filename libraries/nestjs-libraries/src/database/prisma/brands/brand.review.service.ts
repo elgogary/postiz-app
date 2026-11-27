@@ -1,5 +1,5 @@
 // >>> SANAD-BRANDS: a brand's posts as cards, the review actions (spec rules 1 to 5) and comments.
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PostBrief } from '@prisma/client';
 import { BrandsService } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.service';
@@ -205,8 +205,8 @@ export class BrandReviewService {
     return { postId: made.postId as string };
   }
 
-  // Un-plan: a post planned from an idea and not yet sent for review goes back to the idea as New. Each step can be
-  // run again after a failure: the post first, then the idea, the brief last.
+  // Un-plan: a post planned from an idea and not yet sent for review goes back to the idea as New. The brief is deleted
+  // first, by a conditional delete: only one of two racing calls wins, and only the winner deletes the draft.
   async unplan(orgId: string, userId: string, orgRole: OrgRole, customerId: string, briefId: string) {
     const ctx = await this._brands.context(orgId, userId, orgRole, customerId);
     this.mustCreate(ctx.role);
@@ -214,11 +214,16 @@ export class BrandReviewService {
     if (!brief) throw new NotFoundException('Planned post not found');
     if (!brief.ideaId) throw new BadRequestException('Only a post planned from an idea can be un-planned');
     if (brief.review !== 'NONE') throw new BadRequestException('This post was already sent for review: stop it first');
-    const post = brief.postId ? await this._repo.post(orgId, ctx.channels.map((c) => c.id), brief.postId) : null;
+    let post: { group: string; state: string } | null = brief.postId ? await this._repo.post(orgId, ctx.channels.map((c) => c.id), brief.postId) : null;
+    if (!post && brief.postId) {
+      // The post may sit on a channel no longer in this brand: it still must not be live when the brief goes.
+      const other = await this._repo.postAnywhere(orgId, brief.postId);
+      if (other && !other.deletedAt) post = other;
+    }
     if (post && post.state !== 'DRAFT') throw new BadRequestException('Only a planned or draft post can be un-planned');
-    if (post) await this._posts.deletePost(orgId, post.group);
+    if ((await this._repo.deleteUnplanned(orgId, brief.id)) !== 1) throw new ConflictException('This post was already un-planned');
     await this._ideas.release(orgId, brief.ideaId, brief.id);
-    await this._repo.deleteBrief(brief.id);
+    if (post) await this._posts.deletePost(orgId, post.group);
     return { ok: true };
   }
 

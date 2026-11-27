@@ -55,7 +55,10 @@ function editSetup(o: { brief?: boolean; queued?: boolean; off?: boolean; access
       findMany: async () => (o.brief === false ? [] : [{ id: 'b1', postId: 'p1', customerId: 'm' }]),
       updateMany: async (a: unknown) => { updates.push(a); return {}; },
     },
-    post: { findMany: async () => (o.queued === false ? [] : [{ id: 'p1' }]) },
+    post: { findMany: async ({ where }: { where: { id: { in: string[] }; parentPostId?: unknown } }) =>
+      (where.parentPostId && typeof where.parentPostId === 'object'
+        ? where.id.in.filter((i) => i === 'c1').map(() => ({ parentPostId: 'p1' }))
+        : o.queued === false ? [] : [{ id: 'p1' }]) },
     brandSettings: { findMany: async () => (o.off ? [{ customerId: 'm', requiresApproval: false }] : []) },
     brandAccess: { findMany: async () => (o.access ? [{ customerId: 'm', role: o.access }] : []) },
   } };
@@ -91,4 +94,9 @@ test('a brand without an approval step, a post with no approved brief, or a post
   assert.deepEqual(await editSetup({ brief: false }).svc.editsNeedingReview('o', ed(), ['p1']), []);
   assert.deepEqual(await editSetup({ queued: false }).svc.editsNeedingReview('o', ed(), ['p1']), []);
   assert.deepEqual(await editSetup().svc.editsNeedingReview('o', ed(), ['', '']), []);
+});
+
+test('a thread child id in the body counts as its approved root', async () => {
+  const held = await editSetup().svc.editsNeedingReview('o', ed(), ['c1']);
+  assert.deepEqual(held, [{ postId: 'p1', briefId: 'b1' }]);
 });
