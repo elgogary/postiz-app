@@ -1,0 +1,16 @@
+[
+  {
+    "rank": 1, "source": "tiktok_creative_center", "rankingScope": "country_period", "isFormalRanking": true, "type": "hashtag",
+    "name": "#sampletag", "hashtagId": "1000001", "hashtagUrl": "https://www.tiktok.com/tag/sampletag",
+    "publishedVideoCount": 48200, "videoViews": 128000000, "trend": "rising", "trendStage": "rising", "momentumPct": 36,
+    "peakDate": "2026-11-27",
+    "popularityCurve": [{ "date": "2026-11-26", "value": 88.5 }, { "date": "2026-11-27", "value": 100 }],
+    "industries": ["Tech & Electronics"], "listRank": 1, "listIndustry": "Tech & Electronics",
+    "countryCode": "SA", "period": 7, "scrapedAt": "2026-11-28T10:30:00.000Z"
+  },
+  {
+    "rank": 2, "source": "tiktok_creative_center", "rankingScope": "country_period_list", "isFormalRanking": false, "type": "hashtag",
+    "name": "#othertag", "hashtagId": "1000002", "hashtagUrl": "https://www.tiktok.com/tag/othertag",
+    "videoViews": 5000, "countryCode": "SA", "period": 7, "scrapedAt": "2026-11-28T10:30:00.000Z"
+  }
+]
