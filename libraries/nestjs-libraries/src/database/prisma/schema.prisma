@@ -1114,6 +1114,33 @@ model BrandSettings {
 
   @@index([orgId])
 }
+
+model BrandTrend {
+  id         String   @id @default(uuid())
+  orgId      String
+  customerId String
+  week       DateTime
+  key        String
+  title      String
+  kind       String   @default("topic")
+  pillar     String   @default("")
+  score      Int      @default(0)
+  growth     Float?
+  capped     Boolean  @default(false)
+  thisWeek   Int      @default(0)
+  average    Float    @default(0)
+  signals    Json     @default("{}")
+  items      Json     @default("[]")
+  fit        String   @default("")
+  hook       String   @default("")
+  angle      String   @default("")
+  bullets    Json     @default("[]")
+  ideaId     String?
+  createdAt  DateTime @default(now())
+
+  @@unique([orgId, customerId, week, key])
+  @@index([orgId, week])
+}
 // <<< SANAD-BRANDS
 
 // >>> SANAD-BRANDS: one row per planned or reviewed post of a brand. postId is the Postiz root post id (the group
