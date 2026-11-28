@@ -12,6 +12,8 @@ export interface TiktokTag { name: string; url: string; views: number; videos: n
 
 const TIMEOUT_MS = 20000;
 const APIFY_TIMEOUT_MS = 120000;
+// a 20-video TikTok search with sorting and a date filter can take minutes; Apify ends a waiting run at 300 s
+const TIKTOK_VIDEOS_TIMEOUT_MS = 290000;
 export const APIFY_MAX_ITEMS = 50;
 const DAY = 86400000;
 const HN = 'https://hacker-news.firebaseio.com/v0';
@@ -155,13 +157,13 @@ export async function githubNew(query: string, since: string, f: FetchFn = fetch
 
 // ---------- Apify ----------
 // the token goes in a header, never the URL, so no error or log line can carry it
-export async function apifyRun(actor: string, input: Record<string, unknown>, f: FetchFn = fetch): Promise<any[]> {
+export async function apifyRun(actor: string, input: Record<string, unknown>, f: FetchFn = fetch, timeoutMs = APIFY_TIMEOUT_MS): Promise<any[]> {
   const token = env('APIFY_TOKEN');
   if (!token) return [];
   const url = `https://api.apify.com/v2/acts/${encodeURIComponent(actor)}/run-sync-get-dataset-items`;
   const res = await f(url, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(input),
-    redirect: 'error', signal: AbortSignal.timeout(APIFY_TIMEOUT_MS),
+    redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`Apify actor ${actor} answered ${res.status}`);
   const items = await res.json();
@@ -225,6 +227,6 @@ export const tiktokVideosInput = (keyword: string, country: string) => {
 export async function tiktokVideos(keyword: string, country: string, f: FetchFn = fetch): Promise<TiktokVideo[]> {
   const actor = env('APIFY_TREND_TIKTOK_VIDEOS_ACTOR');
   if (!env('APIFY_TOKEN') || !actor) return [];
-  return mapTiktokVideos(await apifyRun(actor, tiktokVideosInput(keyword, country), f));
+  return mapTiktokVideos(await apifyRun(actor, tiktokVideosInput(keyword, country), f, TIKTOK_VIDEOS_TIMEOUT_MS));
 }
 // <<< SANAD-BRANDS
