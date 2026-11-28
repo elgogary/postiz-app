@@ -133,6 +133,21 @@ test('apify readers skip without token or actor, and cap at 50 items', async () 
   } finally { for (const k of keys) { if (old[k] === undefined) delete process.env[k]; else process.env[k] = old[k]; } }
 });
 
+test('apifyRun sends the token in a header, never the URL, and skips without one', async () => {
+  let seen: { url: string; init: any } | null = null;
+  const f = (async (url: string, init: any) => { seen = { url, init }; return res([]); }) as any;
+  assert.deepEqual(await apifyRun('u~a', {}, f), []);
+  assert.equal(seen, null);
+  process.env.APIFY_TOKEN = 'secret-token';
+  try {
+    await apifyRun('u~a', { maxResults: 50 }, f);
+    assert.ok(seen && !(seen as any).url.includes('secret-token'));
+    assert.equal((seen as any).init.headers.Authorization, 'Bearer secret-token');
+    assert.equal((seen as any).init.redirect, 'error');
+    assert.deepEqual(JSON.parse((seen as any).init.body), { maxResults: 50 });
+  } finally { delete process.env.APIFY_TOKEN; }
+});
+
 test('apifyRun error never carries the token', async () => {
   process.env.APIFY_TOKEN = 'secret-token';
   try {

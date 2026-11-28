@@ -123,10 +123,13 @@ export async function githubNew(query: string, since: string, f: FetchFn = fetch
 }
 
 // ---------- Apify ----------
+// the token goes in a header, never the URL, so no error or log line can carry it
 export async function apifyRun(actor: string, input: Record<string, unknown>, f: FetchFn = fetch): Promise<any[]> {
-  const url = `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(env('APIFY_TOKEN'))}`;
+  const token = env('APIFY_TOKEN');
+  if (!token) return [];
+  const url = `https://api.apify.com/v2/acts/${encodeURIComponent(actor)}/run-sync-get-dataset-items`;
   const res = await f(url, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(input),
     redirect: 'error', signal: AbortSignal.timeout(APIFY_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`Apify actor ${actor} answered ${res.status}`);
