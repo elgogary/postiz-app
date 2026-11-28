@@ -116,11 +116,11 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
     const list = (k: TrendItem['kind']) => v.items.filter((i) => i.kind === k);
     if (has(v, 'news') && (v.thisWeek > 0 || v.signals.outlets > 0)) {
       out.push([v.thisWeek > 0 ? `${t('source_news', 'News')} ${v.thisWeek}${v.capped ? '+' : ''}` : t('source_news', 'News'),
-        v.signals.outlets > 0 ? `${v.signals.outlets} ${t('outlets', 'outlets')}` : ''].filter(Boolean).join(' · '));
+        v.signals.outlets > 0 ? `${v.signals.outlets} ${v.signals.outlets === 1 ? t('trend_outlet', 'outlet') : t('trend_outlets', 'outlets')}` : ''].filter(Boolean).join(' · '));
     }
     if (has(v, 'github')) {
       const n = list('github').length;
-      out.push([`${t('source_github', 'GitHub')}${n > 0 ? ` ${n} ${t('repos', 'repos')}` : ''}`, `${num(v.signals.topRepoStars)} ${t('stars', 'stars')}`].join(n > 0 ? ' · ' : ' '));
+      out.push([`${t('source_github', 'GitHub')}${n > 0 ? ` ${n} ${t('trend_repos', 'repos')}` : ''}`, `${num(v.signals.topRepoStars)} ${t('trend_stars', 'stars')}`].join(n > 0 ? ' · ' : ' '));
     }
     if (has(v, 'hn')) out.push(`${t('source_hn', 'Hacker News')} ${num(v.signals.hnPoints)} ${t('points', 'points')}`);
     if (has(v, 'linkedin')) {
@@ -130,7 +130,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
     list('tiktok').slice(0, 2).forEach((i) => out.push(`${t('source_tiktok', 'TikTok')} ${i.title}`));
     return out;
   };
-  const growth = (v: TrendView) => (v.growth === null ? t('trend_new', 'New') : `+${Math.round(v.growth * 100)}%${v.capped ? ` ${t('or_more', 'or more')}` : ''}`);
+  const growth = (v: TrendView) => (v.growth === null ? t('trend_new', 'New') : `${v.growth >= 0 ? '+' : ''}${Math.round(v.growth * 100)}%${v.capped ? ` ${t('or_more', 'or more')}` : ''}`);
   const parts = (v: TrendView) => {
     const p = roundParts(trendParts({ ...v.signals, growth: v.growth }));
     return t('trend_score_line', 'Growth {g} + engagement {e} + spread {s} + freshness {f} = {n}')
@@ -158,7 +158,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
         <span className="ms-auto text-[13px] text-customColor18">{t('trends_week', 'Week of {from} to {to}').replace('{from}', from).replace('{to}', to)}</span>
       </div>
       {failed && <Retry text={failed} onRetry={load} />}
-      <div className="bg-sixth border border-fifth rounded-[12px] overflow-x-auto max-w-full">
+      <div className="bg-sixth border border-fifth rounded-[12px] overflow-x-auto [contain:paint]">
         <table className="w-full min-w-[960px] table-fixed border-collapse text-[13px]">
           <colgroup>
             <col style={{ width: page ? 280 : 300 }} />{page && <col style={{ width: 168 }} />}<col style={{ width: 76 }} /><col style={{ width: 200 }} /><col /><col style={{ width: 176 }} /><col style={{ width: 144 }} />
@@ -192,7 +192,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
                     <td className={`${TD} align-top text-[20px] font-[600] tabular-nums`}>{v.score}</td>
                     <td className={`${TD} align-top`}>
                       <span className="block font-[600]">{growth(v)}</span>
-                      <span className="block text-[12px] text-customColor18">{t('trend_basis', '{n} articles; 4-week average {a}').replace('{n}', `${v.thisWeek}${v.capped ? '+' : ''}`).replace('{a}', trim(v.average))}</span>
+                      <span className="block text-[12px] text-customColor18">{(v.thisWeek === 1 && !v.capped ? t('trend_basis_one', '{n} article; 4-week average {a}') : t('trend_basis', '{n} articles; 4-week average {a}')).replace('{n}', `${v.thisWeek}${v.capped ? '+' : ''}`).replace('{a}', trim(v.average))}</span>
                     </td>
                     <td className={`${TD} align-top`}>
                       <div className="flex flex-wrap gap-[6px]">{where(v).map((w) => <span key={w} className="px-[6px] rounded-[6px] border border-fifth text-[12px]"><Text text={w} /></span>)}</div>
