@@ -210,7 +210,14 @@ export class BrandTrendsService {
         note: row.fit || null, tags: ['trend'], hook, angle: row.angle, bullets, brandIds: [row.customerId],
         topic: 'General', pillars: row.pillar ? [row.pillar] : [], format: '', status: 'NEW',
       });
-      if (!(await this._repo.claimIdea(orgId, trendId, idea.id))) {
+      let claimed: boolean;
+      try {
+        claimed = await this._repo.claimIdea(orgId, trendId, idea.id);
+      } catch (e) {
+        await this._ideas.updateOp(orgId, idea.id, { deletedAt: new Date() });
+        throw e;
+      }
+      if (!claimed) {
         await this._ideas.updateOp(orgId, idea.id, { deletedAt: new Date() });
         const again = await this._repo.row(orgId, trendId);
         if (again?.ideaId) return { ideaId: again.ideaId };
