@@ -65,6 +65,15 @@ export async function newsItems(q: string, lang: string, country: string, f: Fet
   return parseNewsRss(await getText(newsUrl(q, lang, country), f));
 }
 
+// the Google News front-page feed of one topic (TECHNOLOGY, BUSINESS) for a country and language
+export function newsTopicUrl(topic: string, lang: string, country: string): string {
+  return `https://news.google.com/rss/headlines/section/topic/${encodeURIComponent(topic)}?` + new URLSearchParams({ hl: lang, gl: country, ceid: `${country}:${lang.split('-')[0]}` });
+}
+
+export async function newsTopic(topic: string, lang: string, country: string, f: FetchFn = fetch): Promise<NewsItem[]> {
+  return parseNewsRss(await getText(newsTopicUrl(topic, lang, country), f));
+}
+
 // window w (0 = this week) is the 7 days ending at weekEnd minus 7*w days
 export function newsWindow(weekEnd: Date, w: number): { from: Date; to: Date } {
   return { from: new Date(weekEnd.getTime() - DAY * 7 * (w + 1)), to: new Date(weekEnd.getTime() - DAY * 7 * w) };
