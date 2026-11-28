@@ -136,8 +136,8 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
     const videos = list('tiktok').filter((i) => i.url.includes('/video/'));
     list('tiktok').filter((i) => !i.url.includes('/video/')).slice(0, 2).forEach((i) => out.push(`${t('source_tiktok', 'TikTok')} ${i.title}`));
     if (videos.length > 0 || (v.signals.tiktokViews ?? 0) > 0) {
-      out.push([t('source_tiktok', 'TikTok'), videos.length > 0 ? `${videos.length} ${videos.length === 1 ? t('video', 'video') : t('videos', 'videos')}` : ''].filter(Boolean).join(' ') +
-        ((v.signals.tiktokViews ?? 0) > 0 ? ` · ${num(v.signals.tiktokViews ?? 0)} ${t('views', 'views')}` : ''));
+      out.push([t('source_tiktok', 'TikTok'), videos.length > 0 ? `${videos.length} ${videos.length === 1 ? t('trend_video', 'video') : t('trend_videos', 'videos')}` : ''].filter(Boolean).join(' ') +
+        ((v.signals.tiktokViews ?? 0) > 0 ? ` · ${num(v.signals.tiktokViews ?? 0)} ${t('trend_views', 'views')}` : ''));
     }
     return out;
   };
