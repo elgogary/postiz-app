@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import {
   decodeEntities, parseNewsRss, newsUrl, newsWindow, newsWeeks, mapHnItem, hackerNewsTop, githubUrl, mapGithub, githubNew,
   mapLinkedin, mapTiktok, linkedinInput, tiktokInput, linkedinPosts, tiktokHashtags, apifyRun, newsTopic,
-  mapTiktokVideos, tiktokVideosInput, tiktokVideos,
+  mapTiktokVideos, tiktokVideosInput, tiktokVideos, parseFeed, securityNews, parseTrendingRss, githubTrending,
 } from './trend.sources';
 
 test('newsTopic follows one redirect on news.google.com only', async () => {
@@ -217,4 +217,122 @@ test('tiktok videos reader skips without token or actor', async () => {
     assert.equal((await tiktokVideos('k', 'SA', f)).length, 4);
     assert.equal(calls, 1);
   } finally { for (const k of keys) { if (old[k] === undefined) delete process.env[k]; else process.env[k] = old[k]; } }
+});
+
+const NOW = new Date('2026-11-28T12:00:00Z');
+const RSS = `<?xml version="1.0"?><rss><channel><title>Feed</title><link>https://site.example.test/</link>
+<item><title>Vendor breach &amp; fix</title><link>https://site.example.test/a?x=1&amp;y=2</link><pubDate>Thu, 26 Nov 2026 09:00:00 GMT</pubDate></item>
+<item><title>Old story</title><link>https://site.example.test/old</link><pubDate>Mon, 02 Nov 2026 09:00:00 GMT</pubDate></item>
+<item><title>No date</title><link>https://site.example.test/nodate</link></item>
+</channel></rss>`;
+const ATOM = `<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom</title><link rel="alternate" type="text/html" href="https://atom.example.test/" />
+<entry><title type="html">Weak cipher claim</title><link rel="alternate" type="text/html" href="https://atom.example.test/p?a=1&amp;b=2" /><link rel="self" href="https://atom.example.test/self" /><published>2026-11-27T10:00:00Z</published><updated>2026-11-27T11:00:00Z</updated></entry>
+<entry><title>Updated only</title><link href="https://atom.example.test/u"/><updated>2026-11-25T10:00:00Z</updated></entry>
+</feed>`;
+
+test('parseFeed reads RSS items and Atom entries (links by href, dates from published or updated)', () => {
+  const r = parseFeed(RSS);
+  assert.deepEqual(r.map((i) => [i.title, i.url, i.date]), [
+    ['Vendor breach & fix', 'https://site.example.test/a?x=1&y=2', '2026-11-26T09:00:00.000Z'],
+    ['Old story', 'https://site.example.test/old', '2026-11-02T09:00:00.000Z'],
+    ['No date', 'https://site.example.test/nodate', ''],
+  ]);
+  const a = parseFeed(ATOM);
+  assert.deepEqual(a.map((i) => [i.title, i.url, i.date]), [
+    ['Weak cipher claim', 'https://atom.example.test/p?a=1&b=2', '2026-11-27T10:00:00.000Z'],
+    ['Updated only', 'https://atom.example.test/u', '2026-11-25T10:00:00.000Z'],
+  ]);
+});
+
+const feedFetch = (fail: (u: string) => boolean = () => false, seen: any[] = []) => (async (u: string, init: any) => {
+  seen.push([u, init]);
+  if (fail(u)) return res('no', 503);
+  return res(u.includes('schneier') ? ATOM : RSS);
+}) as any;
+
+test('securityNews keeps the last 7 days, names the site, sends a browser User-Agent', async () => {
+  const seen: any[] = [];
+  const items = await securityNews(feedFetch(() => false, seen), NOW);
+  assert.equal(seen.length, 5);
+  assert.ok(seen.every(([, i]) => /^Mozilla\/5\.0/.test(i.headers['User-Agent'])));
+  assert.equal(items.length, 4 + 2);
+  assert.ok(items.every((i) => i.date >= '2026-11-21'));
+  assert.deepEqual([...new Set(items.map((i) => i.source))].sort(), ['BleepingComputer', 'KrebsOnSecurity', 'Schneier on Security', 'The Hacker News', 'The Record']);
+  assert.equal(items[0].date, '2026-11-27T10:00:00.000Z');
+});
+
+test('securityNews: one failing feed does not fail the others; all failing throws', async () => {
+  const items = await securityNews(feedFetch((u) => u.includes('krebs')), NOW);
+  assert.ok(items.length > 0 && !items.some((i) => i.source === 'KrebsOnSecurity'));
+  await assert.rejects(() => securityNews(feedFetch(() => true), NOW), /answered/);
+  await assert.rejects(() => securityNews((async () => { throw new Error('net https://secret/?key=1'); }) as any, NOW), (e: Error) => !e.message.includes('secret'));
+});
+
+test('securityNews follows one redirect for feedburner only to its own hosts', async () => {
+  const hop = (location: string) => (async (u: string) => {
+    if (u === 'https://feeds.feedburner.com/TheHackersNews') return new Response(null, { status: 301, headers: { location } });
+    if (u.includes('feedburner') || u.includes('thehackernews')) return res(RSS);
+    return res('no', 503);
+  }) as any;
+  const ok = await securityNews(hop('https://thehackernews.com/feeds/posts/default'), NOW);
+  assert.ok(ok.some((i) => i.source === 'The Hacker News'));
+  const bad = await securityNews(hop('https://other.example.test/rss'), NOW).catch(() => []);
+  assert.ok(!bad.some((i) => i.source === 'The Hacker News'));
+});
+
+const TRENDING = `<rss><channel><title>T</title><link>https://t.example.test</link>
+<item><title>owner-a/repo-a</title><link>https://github.com/owner-a/repo-a</link><description>&lt;p&gt;README text&lt;/p&gt;</description></item>
+<item><title>owner-b/repo.b</title><link>https://github.com/owner-b/repo.b</link><description>x</description></item>
+<item><title>not a repo</title><link>https://github.com/x/y</link></item>
+<item><title>evil/repo</title><link>https://evil.example.test/evil/repo</link></item>
+</channel></rss>`;
+
+test('parseTrendingRss keeps titles and links only and drops odd entries', () => {
+  assert.deepEqual(parseTrendingRss(TRENDING), [
+    { name: 'owner-a/repo-a', url: 'https://github.com/owner-a/repo-a' },
+    { name: 'owner-b/repo.b', url: 'https://github.com/owner-b/repo.b' },
+  ]);
+});
+
+test('githubTrending looks up stars officially, token only when set, failure keeps 0', async () => {
+  const seen: [string, any][] = [];
+  const f = (async (u: string, init: any) => {
+    seen.push([u, init]);
+    if (u.includes('GitHubTrendingRSS')) return res(TRENDING);
+    if (u.endsWith('/repo-a')) return res({ stargazers_count: 321, description: 'Short text', created_at: '2026-11-20T00:00:00Z' });
+    return res('no', 404);
+  }) as any;
+  const old = process.env.GITHUB_TOKEN;
+  try {
+    process.env.GITHUB_TOKEN = '';
+    const none = await githubTrending(f);
+    assert.deepEqual(none, [
+      { name: 'owner-a/repo-a', url: 'https://github.com/owner-a/repo-a', stars: 321, description: 'Short text', created: '2026-11-20T00:00:00Z' },
+      { name: 'owner-b/repo.b', url: 'https://github.com/owner-b/repo.b', stars: 0, description: '', created: '' },
+    ]);
+    const api = seen.filter(([u]) => u.startsWith('https://api.github.com/repos/'));
+    assert.equal(api.length, 2);
+    assert.ok(api.every(([, i]) => i.headers.Authorization === undefined));
+    seen.length = 0;
+    process.env.GITHUB_TOKEN = 'tok';
+    await githubTrending(f);
+    assert.ok(seen.filter(([u]) => u.startsWith('https://api.github.com/')).every(([, i]) => i.headers.Authorization === 'Bearer tok'));
+    assert.ok(seen.filter(([u]) => !u.startsWith('https://api.github.com/')).every(([, i]) => i.headers.Authorization === undefined));
+  } finally { if (old === undefined) delete process.env.GITHUB_TOKEN; else process.env.GITHUB_TOKEN = old; }
+});
+
+test('githubTrending reads at most 15 repos, 4 lookups at a time', async () => {
+  const feed = '<rss><channel>' + Array.from({ length: 25 }, (_, n) => `<item><title>o/r${n}</title><link>https://github.com/o/r${n}</link></item>`).join('') + '</channel></rss>';
+  let live = 0, peak = 0, calls = 0;
+  const f = (async (u: string) => {
+    if (u.includes('GitHubTrendingRSS')) return res(feed);
+    calls += 1; live += 1; peak = Math.max(peak, live);
+    await new Promise((r) => setTimeout(r, 5));
+    live -= 1;
+    return res({ stargazers_count: 1 });
+  }) as any;
+  const r = await githubTrending(f);
+  assert.equal(r.length, 15);
+  assert.equal(calls, 15);
+  assert.ok(peak <= 4);
 });

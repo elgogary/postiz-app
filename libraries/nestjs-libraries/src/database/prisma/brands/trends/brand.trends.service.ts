@@ -15,11 +15,12 @@ import { MAX_TRENDS, TrendItem, TrendSignals, TrendView, growthOf, topicKey, tre
 export interface TrendSources {
   newsItems: typeof src.newsItems; newsTopic: typeof src.newsTopic; newsWeeks: typeof src.newsWeeks;
   hackerNewsTop: typeof src.hackerNewsTop; githubNew: typeof src.githubNew;
+  securityNews: typeof src.securityNews; githubTrending: typeof src.githubTrending;
   linkedinPosts: typeof src.linkedinPosts; tiktokHashtags: typeof src.tiktokHashtags; tiktokVideos: typeof src.tiktokVideos;
 }
 const LIVE: TrendSources = {
   newsItems: src.newsItems, newsTopic: src.newsTopic, newsWeeks: src.newsWeeks, hackerNewsTop: src.hackerNewsTop,
-  githubNew: src.githubNew, linkedinPosts: src.linkedinPosts, tiktokHashtags: src.tiktokHashtags, tiktokVideos: src.tiktokVideos,
+  githubNew: src.githubNew, securityNews: src.securityNews, githubTrending: src.githubTrending, linkedinPosts: src.linkedinPosts, tiktokHashtags: src.tiktokHashtags, tiktokVideos: src.tiktokVideos,
 };
 
 // a found item and its raw engagement number (points, stars or reactions), kept for the score only
@@ -31,6 +32,7 @@ const DAY = 86400000;
 const CAP = 100;
 const MAX_FOUND = 120;
 const MAX_SHOWN = 6;
+const MAX_SECURITY = 30;
 const TEXT_CAP = 3000;
 const HN_MIN_POINTS = 100;
 // a hashtag's views are a running total of all time, so only video links count toward the score
@@ -141,6 +143,11 @@ export class BrandTrendsService {
     for (const f of FEEDS) for (const n of await safe('news-feed', () => s.newsTopic(f, plan.language, plan.country), [])) {
       newsFound.push({ title: n.title, url: n.url, source: n.source, date: n.date, kind: 'news', n: 0 });
     }
+    if (plan.security) {
+      for (const n of (await safe('security', () => s.securityNews(), [])).slice(0, MAX_SECURITY)) {
+        add({ title: n.title, url: n.url, source: n.source, date: n.date, kind: 'security', n: 0 });
+      }
+    }
     if (plan.tech) {
       for (const h of await safe('hackernews', () => s.hackerNewsTop(HN_MIN_POINTS), [])) {
         add({ title: h.title, url: h.url, source: 'Hacker News', date: h.date, kind: 'hn', metric: `${h.points} points`, n: h.points });
@@ -148,6 +155,11 @@ export class BrandTrendsService {
       const since = new Date(this.now().getTime() - 7 * DAY).toISOString().slice(0, 10);
       for (const q of plan.githubQueries) for (const r of await safe('github', () => s.githubNew(q, since), [])) {
         add({ title: r.name, url: r.url, source: 'GitHub', date: r.created, kind: 'github', metric: `${r.stars} stars`, n: r.stars });
+      }
+    }
+    if (plan.tech) {
+      for (const r of await safe('github-trending', () => s.githubTrending(), [])) {
+        add({ title: r.description ? `${r.name}: ${r.description}` : r.name, url: r.url, source: 'GitHub trending', date: r.created, kind: 'github', metric: `${r.stars} stars`, n: r.stars });
       }
     }
     for (const k of plan.linkedinKeywords) for (const p of await safe('linkedin', () => s.linkedinPosts(k), [])) {
@@ -180,7 +192,7 @@ export class BrandTrendsService {
     const fresh = matched.filter((m) => { const t = Date.parse(m.date); return Number.isFinite(t) && t >= cutoff; }).length;
     const signals: TrendSignals = {
       hnPoints: max('hn'), tiktokViews: Math.max(0, ...matched.filter((m) => m.kind === 'tiktok' && TIKTOK_VIDEO.test(m.url)).map((m) => m.n)), topRepoStars: max('github'), linkedinReactions: matched.filter((m) => m.kind === 'linkedin').reduce((a, m) => a + m.n, 0),
-      outlets: weeks?.[0]?.outlets ?? 0, platforms: new Set(matched.map((m) => m.kind)).size, freshShare: matched.length ? fresh / matched.length : 0,
+      outlets: weeks?.[0]?.outlets ?? 0, securitySites: new Set(matched.filter((m) => m.kind === 'security').map((m) => m.source)).size, platforms: new Set(matched.map((m) => m.kind)).size, freshShare: matched.length ? fresh / matched.length : 0,
     };
     return {
       key: topicKey(c.title), title: c.title, kind: c.kind, pillar: c.pillar, score: trendScore({ ...signals, growth }), growth,

@@ -17,7 +17,7 @@ const QUIET = 'text-[13px] px-[12px] h-[32px] [@media(max-width:480px)]:h-[44px]
 const ON = 'border-[#612BD3] text-[#5221b8] dark:text-[#c4b5fd] bg-[#612BD3]/10';
 const SELECT = 'h-[36px] [@media(max-width:480px)]:h-[44px] px-[8px] bg-input border border-fifth rounded-[6px] text-[13px]';
 const SOURCES: [TrendItem['kind'], string, string][] = [
-  ['news', 'source_news', 'News'], ['github', 'source_github', 'GitHub'], ['hn', 'source_hn', 'Hacker News'],
+  ['news', 'source_news', 'News'], ['security', 'trend_source_security', 'Security'], ['github', 'source_github', 'GitHub'], ['hn', 'source_hn', 'Hacker News'],
   ['linkedin', 'source_linkedin', 'LinkedIn'], ['tiktok', 'source_tiktok', 'TikTok'],
 ];
 const DAY = 86400000;
@@ -26,6 +26,7 @@ const TD = TDBASE.replace('h-[60px]', '').replace(/\s+/g, ' ').trim();
 const has = (v: TrendView, kind: TrendItem['kind']) => {
   const n = v.items.some((i) => i.kind === kind);
   if (kind === 'news') return n || v.thisWeek > 0 || v.signals.outlets > 0;
+  if (kind === 'security') return n;
   if (kind === 'github') return n || v.signals.topRepoStars > 0;
   if (kind === 'hn') return n || v.signals.hnPoints > 0;
   if (kind === 'linkedin') return n || v.signals.linkedinReactions > 0;
@@ -123,6 +124,11 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
     if (has(v, 'news') && (v.thisWeek > 0 || v.signals.outlets > 0)) {
       out.push([v.thisWeek > 0 ? `${t('source_news', 'News')} ${v.thisWeek}${v.capped ? '+' : ''}` : t('source_news', 'News'),
         v.signals.outlets > 0 ? `${v.signals.outlets} ${v.signals.outlets === 1 ? t('trend_outlet', 'outlet') : t('trend_outlets', 'outlets')}` : ''].filter(Boolean).join(' · '));
+    }
+    if (has(v, 'security')) {
+      const items = list('security');
+      const sites = new Set(items.map((i) => i.source)).size;
+      out.push(`${t('trend_source_security', 'Security')} ${items.length} · ${sites} ${sites === 1 ? t('trend_site', 'site') : t('trend_sites', 'sites')}`);
     }
     if (has(v, 'github')) {
       const n = list('github').length;

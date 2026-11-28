@@ -5,7 +5,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 
 export interface TrendPlan {
-  language: 'ar' | 'en'; country: string; newsQueries: string[]; tech: boolean; githubQueries: string[];
+  language: 'ar' | 'en'; country: string; newsQueries: string[]; tech: boolean; security: boolean; githubQueries: string[];
   linkedinKeywords: string[]; videoKeywords: string[]; tiktok: { country: string; industry: string } | null;
 }
 export interface PlanInput { brand: string; summary: string; voice: string; pillars: string[] }
@@ -42,6 +42,7 @@ export function planPrompt(i: PlanInput) {
     'country: the two-letter code of the brand\'s main audience, for example SA, EG, AE, GB, US.',
     `newsQueries: at most ${MAX_NEWS_QUERIES} short news search phrases in that language, each on one subject the audience follows.`,
     'tech: true only when the audience follows software, AI or developer news, otherwise false.',
+    'security: true when the brand\'s summary, voice or pillars touch trust, security, data protection, governance or platform reliability, or the brand is a tech or software brand, otherwise false.',
     `githubQueries: at most ${MAX_GITHUB_QUERIES} short English keywords to search new code repositories, empty unless tech is true.`,
     `linkedinKeywords: at most ${MAX_LINKEDIN_KEYWORDS} short keywords to search LinkedIn posts, in the language the audience posts in.`,
     `videoKeywords: at most ${MAX_VIDEO_KEYWORDS} short phrases (60 characters at most) to search TikTok videos, mixing the brand\'s language and English, about the kind of short videos the brand makes. Ask for it only when the summary, voice or content mix shows the brand makes short videos (reels, TikTok, a video series), otherwise an empty list.`,
@@ -64,6 +65,7 @@ export function parsePlan(text: string): TrendPlan | null {
     country: country(o.country) || 'US',
     newsQueries,
     tech,
+    security: o.security === true,
     githubQueries: tech ? strs(o.githubQueries, MAX_GITHUB_QUERIES) : [],
     linkedinKeywords: strs(o.linkedinKeywords, MAX_LINKEDIN_KEYWORDS),
     videoKeywords: strs(o.videoKeywords, MAX_VIDEO_KEYWORDS, 60),
@@ -73,7 +75,7 @@ export function parsePlan(text: string): TrendPlan | null {
 
 // a week can bring 300 items (150 LinkedIn posts alone): the prompt takes at most this many of each kind, in the order
 // found, so the answer stays complete (Moonsab's call failed on 28 Nov with every item in)
-export const PROMPT_QUOTA: Record<string, number> = { news: 60, linkedin: 30, hn: 15, github: 10, tiktok: 20 };
+export const PROMPT_QUOTA: Record<string, number> = { news: 60, linkedin: 30, hn: 15, github: 20, tiktok: 20, security: 20 };
 export function promptItems<T extends { kind: string }>(items: T[]): T[] {
   const used: Record<string, number> = {};
   return items.filter((x) => (used[x.kind] = (used[x.kind] || 0) + 1) <= (PROMPT_QUOTA[x.kind] ?? 10));

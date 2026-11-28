@@ -61,7 +61,7 @@ function setup(opts: { role?: string; rows?: Record<string, unknown>[]; plan?: u
   const none = async () => [];
   svc.sources = {
     newsItems: async (q: string) => [{ title: `News ${q}`, url: `https://n/${q}`, source: 'Src', date: recent }],
-    newsTopic: none, hackerNewsTop: none, githubNew: none, linkedinPosts: none, tiktokHashtags: none, tiktokVideos: none,
+    newsTopic: none, hackerNewsTop: none, githubNew: none, securityNews: none, githubTrending: none, linkedinPosts: none, tiktokHashtags: none, tiktokVideos: none,
     newsWeeks: async () => [{ count: 20, outlets: 10 }, { count: 10, outlets: 5 }, { count: 10, outlets: 5 }, { count: 10, outlets: 5 }, { count: 10, outlets: 5 }],
     ...opts.sources,
   } as never;
@@ -325,4 +325,46 @@ test('parsePlan: videoKeywords are clamped to 3 strings of 60 characters, missin
   assert.deepEqual([p.videoKeywords.length, p.videoKeywords[0].length], [3, 60]);
   assert.deepEqual(parsePlan(JSON.stringify({ newsQueries: ['a'] }))!.videoKeywords, []);
   assert.equal(PROMPT_QUOTA.tiktok, 20);
+});
+
+test('plan.security adds security items (no metric, source = the site); plan.tech adds GitHub trending repos', async () => {
+  const s = setup({
+    plan: { ...plan, security: true },
+    clusters: [cluster(1, { itemIds: ['n1', 'n2', 'n3', 'n4'] })],
+    sources: {
+      securityNews: async () => [
+        { title: 'Breach at a vendor', url: 'https://sec.example.test/1', source: 'Site A', date: recent },
+        { title: 'Key leak', url: 'https://sec.example.test/2', source: 'Site B', date: recent },
+        { title: 'Bad link', url: 'javascript:alert(1)', source: 'Site C', date: recent },
+      ],
+      githubTrending: async () => [
+        { name: 'o/r', url: 'https://github.com/o/r', stars: 1200, description: 'A small tool', created: old },
+        { name: 'o/q', url: 'https://github.com/o/q', stars: 0, description: '', created: '' },
+      ],
+    },
+  });
+  await s.svc.run('o');
+  const row = (saved(s.calls)[4] as Record<string, any>[])[0];
+  const sec = row.items.filter((i: any) => i.kind === 'security');
+  assert.deepEqual(sec.map((i: any) => [i.source, i.metric]), [['Site A', undefined], ['Site B', undefined]]);
+  const gh = row.items.filter((i: any) => i.kind === 'github');
+  assert.deepEqual(gh.map((i: any) => [i.title, i.source, i.metric]), [['o/r: A small tool', 'GitHub trending', '1200 stars'], ['o/q', 'GitHub trending', '0 stars']]);
+  assert.equal(row.signals.topRepoStars, 1200);
+  assert.equal(row.signals.securitySites, 2);
+});
+
+test('without plan.security no security call is made; without plan.tech no trending call', async () => {
+  let n = 0;
+  const count = async () => { n += 1; return []; };
+  const s = setup({ plan: { ...plan, tech: false }, sources: { securityNews: count, githubTrending: count } });
+  await s.svc.run('o');
+  assert.equal(n, 0);
+});
+
+test('parsePlan: security defaults to false and is true only for true', () => {
+  const base = { newsQueries: ['a'] };
+  assert.equal(parsePlan(JSON.stringify(base))!.security, false);
+  assert.equal(parsePlan(JSON.stringify({ ...base, security: 'true' }))!.security, false);
+  assert.equal(parsePlan(JSON.stringify({ ...base, security: true }))!.security, true);
+  assert.ok(PROMPT_QUOTA.security === 20 && PROMPT_QUOTA.github === 20);
 });

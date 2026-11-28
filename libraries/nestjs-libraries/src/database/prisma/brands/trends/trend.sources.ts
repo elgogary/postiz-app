@@ -155,6 +155,95 @@ export async function githubNew(query: string, since: string, f: FetchFn = fetch
   return mapGithub(await getJson(githubUrl(query, since), f, headers));
 }
 
+// ---------- Security news (RSS and Atom feeds of five security outlets) ----------
+export const SECURITY_FEEDS: { url: string; source: string }[] = [
+  { url: 'https://www.bleepingcomputer.com/feed/', source: 'BleepingComputer' },
+  { url: 'https://therecord.media/feed', source: 'The Record' },
+  { url: 'https://feeds.feedburner.com/TheHackersNews', source: 'The Hacker News' },
+  { url: 'https://krebsonsecurity.com/feed/', source: 'KrebsOnSecurity' },
+  { url: 'https://www.schneier.com/feed/atom/', source: 'Schneier on Security' },
+];
+const BROWSER_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+// a feed may answer with one redirect, and only to its own host (feedburner: also to its outlet's site)
+const FEED_REDIRECT_HOSTS: Record<string, string[]> = { 'feeds.feedburner.com': ['feeds.feedburner.com', 'thehackernews.com', 'www.thehackernews.com'] };
+
+const stripTags = (s: string) => s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+// RSS <item> and Atom <entry>: the Atom link is <link href="..."/>, the date <pubDate>, <published> or <updated>
+export function parseFeed(xml: string): { title: string; url: string; date: string }[] {
+  const blocks = [...xml.matchAll(/<(item|entry)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/g)].map((m) => m[2]);
+  return blocks.map((b) => {
+    let url = '';
+    for (const l of b.matchAll(/<link\b([^>]*)>/g)) {
+      const href = /\bhref\s*=\s*"([^"]*)"/.exec(l[1]);
+      const rel = /\brel\s*=\s*"([^"]*)"/.exec(l[1]);
+      if (href && (!rel || rel[1] === 'alternate')) { url = decodeEntities(href[1]).trim(); break; }
+    }
+    if (!url) url = tag(b, 'link') || tag(b, 'guid');
+    const d = new Date(tag(b, 'pubDate') || tag(b, 'published') || tag(b, 'updated'));
+    return { title: stripTags(tag(b, 'title')), url, date: Number.isNaN(d.getTime()) ? '' : d.toISOString() };
+  }).filter((i) => i.title && i.url);
+}
+
+async function getFeed(url: string, f: FetchFn): Promise<string> {
+  const init = (redirect: 'manual' | 'error') => ({ headers: { 'User-Agent': BROWSER_UA, Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*' }, redirect, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  let res = await f(url, init('manual'));
+  if (res.status >= 300 && res.status < 400) {
+    const here = new URL(url);
+    const next = new URL(res.headers.get('location') || '', url);
+    if (next.protocol !== 'https:' || !(FEED_REDIRECT_HOSTS[here.hostname] || [here.hostname]).includes(next.hostname)) throw new Error(`Source answered ${res.status}`);
+    res = await f(next.toString(), init('error'));
+  }
+  if (!res.ok) throw new Error(`Source answered ${res.status}`);
+  return res.text();
+}
+
+// items of the last 7 days from every feed; one feed failing never fails the others, and a throw only when all failed
+export async function securityNews(f: FetchFn = fetch, now: Date = new Date()): Promise<NewsItem[]> {
+  const cutoff = now.getTime() - 7 * DAY;
+  const out: NewsItem[] = [];
+  let failed = 0;
+  await Promise.all(SECURITY_FEEDS.map(async (feed) => {
+    try {
+      for (const i of parseFeed(await getFeed(feed.url, f))) {
+        const t = Date.parse(i.date);
+        if (Number.isFinite(t) && t >= cutoff && /^https?:\/\//i.test(i.url)) out.push({ ...i, source: feed.source });
+      }
+    } catch { failed += 1; }
+  }));
+  if (failed === SECURITY_FEEDS.length) throw new Error('Source answered 0 from every security feed');
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// ---------- GitHub trending (a public third-party feed for the names, the official API for the numbers) ----------
+export const TRENDING_FEED = 'https://mshibanami.github.io/GitHubTrendingRSS/weekly/all.xml';
+export const TRENDING_MAX = 15;
+const TRENDING_PARALLEL = 4;
+
+// <title> is "owner/repo", <link> the repo URL; the description (README text) is never kept
+export function parseTrendingRss(xml: string): { name: string; url: string }[] {
+  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => ({ name: tag(m[1], 'title'), url: tag(m[1], 'link') }))
+    .filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r.name) && r.url === `https://github.com/${r.name}`);
+}
+
+export async function githubTrending(f: FetchFn = fetch): Promise<GithubRepo[]> {
+  const repos = parseTrendingRss(await getText(TRENDING_FEED, f)).slice(0, TRENDING_MAX);
+  const token = env('GITHUB_TOKEN');
+  const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const out: GithubRepo[] = [];
+  for (let i = 0; i < repos.length; i += TRENDING_PARALLEL) {
+    out.push(...await Promise.all(repos.slice(i, i + TRENDING_PARALLEL).map(async (r): Promise<GithubRepo> => {
+      try {
+        const [owner, repo] = r.name.split('/');
+        const body = await getJson<GhRepo>(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, f, headers);
+        return { name: r.name, url: r.url, stars: num(body.stargazers_count), description: body.description || '', created: body.created_at || '' };
+      } catch { return { name: r.name, url: r.url, stars: 0, description: '', created: '' }; }
+    })));
+  }
+  return out;
+}
+
 // ---------- Apify ----------
 // the token goes in a header, never the URL, so no error or log line can carry it
 export async function apifyRun(actor: string, input: Record<string, unknown>, f: FetchFn = fetch, timeoutMs = APIFY_TIMEOUT_MS): Promise<any[]> {
