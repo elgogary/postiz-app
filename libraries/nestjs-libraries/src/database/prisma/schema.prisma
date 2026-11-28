@@ -712,6 +712,32 @@ model mastra_ai_spans {
   endedAtZ     DateTime? @default(now()) @db.Timestamptz(6)
   createdAtZ   DateTime? @default(now()) @db.Timestamptz(6)
   updatedAtZ   DateTime? @default(now()) @db.Timestamptz(6)
+  // >>> SANAD: the columns Mastra adds at start. Without them `prisma db push --accept-data-loss` drops them on every
+  // container start and Mastra adds them back; Postgres never frees a dropped column's slot, so after about 90 starts
+  // the table hit its 1,600-column limit and the backend could not start (28 Nov 2026).
+  entityType       String?
+  entityId         String?
+  entityName       String?
+  parentEntityType String?
+  parentEntityId   String?
+  parentEntityName String?
+  rootEntityType   String?
+  rootEntityId     String?
+  rootEntityName   String?
+  userId           String?
+  organizationId   String?
+  resourceId       String?
+  runId            String?
+  sessionId        String?
+  threadId         String?
+  requestId        String?
+  environment      String?
+  serviceName      String?
+  experimentId     String?
+  source           String?
+  tags             Json?
+  requestContext   Json?
+  // <<< SANAD
 
   @@index([name], map: "public_mastra_ai_spans_name_idx")
   @@index([parentSpanId, startedAt(sort: Desc)], map: "public_mastra_ai_spans_parentspanid_startedat_idx")
@@ -796,6 +822,7 @@ model mastra_scorers {
   createdAtZ           DateTime? @default(now()) @db.Timestamptz(6)
   updatedAtZ           DateTime? @default(now()) @db.Timestamptz(6)
   spanId               String?
+  requestContext       Json? // SANAD: Mastra adds it at start; without it db push drops it on every start
 
   @@index([traceId, spanId, createdAt(sort: Desc)], map: "public_mastra_scores_trace_id_span_id_created_at_idx")
 }
