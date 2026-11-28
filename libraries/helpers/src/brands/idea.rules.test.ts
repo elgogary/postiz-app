@@ -56,6 +56,8 @@ test('topic comes from the first topic tag, else AI, else General', () => {
 test('idea view: fields from the columns or the old text; status from actions and the linked post', () => {
   const old = ideaView(row() as never, null);
   assert.equal(old.hook, 'A clear hook');
+  assert.deepEqual(old.tags, []);
+  assert.deepEqual(ideaView(row({ tags: ['trend'] }) as never, null).tags, ['trend']);
   assert.deepEqual(old.bullets, ['one', 'two']);
   assert.equal(old.topic, 'General');
   assert.equal(old.status, 'NEW');

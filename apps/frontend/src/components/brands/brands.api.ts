@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import type { BrandRole } from '@gitroom/helpers/brands/brand.rules';
 import type { Card } from '@gitroom/helpers/brands/post.rules';
 import type { IdeaView } from '@gitroom/helpers/brands/idea.rules';
+import type { TrendView } from '@gitroom/helpers/brands/trend.rules';
 import type { EmailContacts, EmailOverview, EmailReport } from '@gitroom/helpers/brands/email.rules';
 
 export interface Channel { id: string; name: string; provider: string; picture: string | null }
@@ -21,6 +22,7 @@ export interface BrandPosts {
 export interface IdeaBrand { id: string; name: string; role: BrandRole; pillars: string[] }
 export interface IdeasData { brands: IdeaBrand[]; topics: string[]; ideas: IdeaView[]; more: boolean }
 export interface IdeaInput { hook: string; angle: string; bullets: string[]; brandIds: string[]; topic: string; pillars: string[]; format: string; source: string }
+export interface TrendsData { week: string | null; trends: TrendView[] }
 export interface PostComment { id: string; by: string; text: string; at: string; slide: number | null }
 
 export const fmtWhen = (iso: string) => new Date(iso).toLocaleString('en-GB', {
@@ -100,6 +102,8 @@ export const useBrandsApi = () => {
     planIdea: (id: string, body: { customerId: string; date: string; format: string; ai: boolean }) =>
       send(`/brand-ideas/${id}/plan`, 'POST', body) as Promise<{ briefId: string; firstDraft: boolean; aiFailed: boolean; noChannel: boolean }>,
     refineIdea: (idea: string) => send('/engagement/content-ideas/refine', 'POST', { idea }) as Promise<{ refined: string }>,
+    trends: (scope: string) => send(`/brand-trends?scope=${encodeURIComponent(scope)}`) as Promise<TrendsData>,
+    saveTrend: (id: string) => send(`/brand-trends/${id}/idea`, 'POST', {}) as Promise<{ ideaId: string }>,
     email: (id: string) => send(`/brands/${id}/email`) as Promise<EmailOverview>,
     emailReport: (id: string, channelId: string, campaignId: number) =>
       send(`/brands/${id}/email/${channelId}/campaigns/${campaignId}`) as Promise<EmailReport>,

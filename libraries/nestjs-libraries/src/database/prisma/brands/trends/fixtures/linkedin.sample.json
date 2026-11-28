@@ -1,0 +1,21 @@
+[
+  {
+    "type": "post",
+    "id": "1000000000000000001",
+    "linkedinUrl": "https://www.linkedin.com/posts/author-1_sample-activity-1000000000000000001-aaaa",
+    "content": "Sample post text about ERP",
+    "author": { "universalName": null, "publicIdentifier": "author-1", "type": "profile", "name": "Author 1", "linkedinUrl": "https://www.linkedin.com/in/author-1", "info": "Sample headline" },
+    "postedAt": { "timestamp": 1764316800000, "date": "2025-11-28T08:00:00.000Z", "postedAgoShort": "1d", "postedAgoText": "1 day ago" },
+    "postImages": [],
+    "engagement": { "likes": 132, "comments": 17, "shares": 9, "reactions": [{ "type": "LIKE", "count": 120 }, { "type": "PRAISE", "count": 12 }] }
+  },
+  {
+    "type": "post",
+    "id": "1000000000000000002",
+    "linkedinUrl": "https://www.linkedin.com/posts/author-2_sample-activity-1000000000000000002-bbbb",
+    "content": "",
+    "author": { "name": "Author 2", "linkedinUrl": "https://www.linkedin.com/in/author-2" },
+    "postedAt": { "timestamp": 1764230400000, "date": "2025-11-27T08:00:00.000Z" },
+    "engagement": { "likes": 4, "comments": 0, "shares": 0, "reactions": [] }
+  }
+]

@@ -30,6 +30,7 @@ export const IdeasList: FC<{ scope: string; onPlanned?: () => void }> = ({ scope
   const [topic, setTopic] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [q, setQ] = useState('');
+  const [trendsOnly, setTrendsOnly] = useState(false);
   const [open, setOpen] = useState('');
   const [failed, setFailed] = useState('');
   const [busyId, setBusyId] = useState('');
@@ -58,8 +59,10 @@ export const IdeasList: FC<{ scope: string; onPlanned?: () => void }> = ({ scope
   const roleOf = (id: string) => data.brands.find((b) => b.id === id)?.role;
   const writes = (ids: string[]) => (ids.length ? ids : data.brands.map((b) => b.id)).some((id) => ['create', 'approve'].includes(roleOf(id) || ''));
   const canAdd = brandId ? writes([brandId]) : writes([]);
-  const shown = status === 'ALL' ? pool : pool.filter((i) => i.status === status);
-  const count = (s: string) => (s === 'ALL' ? pool.length : pool.filter((i) => i.status === s).length);
+  const isTrend = (i: IdeaView) => i.tags.includes('trend');
+  const scoped = trendsOnly ? pool.filter(isTrend) : pool;
+  const shown = status === 'ALL' ? scoped : scoped.filter((i) => i.status === status);
+  const count = (s: string) => (s === 'ALL' ? scoped.length : scoped.filter((i) => i.status === s).length);
   const form = (idea: IdeaView | null) => modals.openModal({
     title: idea ? t('edit_idea', 'Edit idea') : t('new_idea', 'New idea'), closeOnClickOutside: false, closeOnEscape: true,
     children: (close: () => void) => <IdeaForm data={data} idea={idea} brandId={brandId} close={close} onDone={load} />,
@@ -101,6 +104,11 @@ export const IdeasList: FC<{ scope: string; onPlanned?: () => void }> = ({ scope
             {t(`idea_status_${s.toLowerCase()}`, LABEL[s])} {count(s)}
           </button>
         ))}
+        <span aria-hidden="true" className="w-px h-[32px] bg-fifth [@media(max-width:480px)]:h-[44px]" />
+        <button aria-pressed={trendsOnly} onClick={() => setTrendsOnly(!trendsOnly)}
+          className={`${QUIET} ${trendsOnly ? 'border-[#612BD3] text-[#5221b8] dark:text-[#c4b5fd] bg-[#612BD3]/10' : ''}`}>
+          {t('from_trends', 'From trends')} {pool.filter(isTrend).length}
+        </button>
       </div>
       {shown.length === 0 ? <div className="text-[13px] text-customColor18">{t('no_ideas_here', 'No ideas here.')}</div> : (
         <ul className="bg-sixth border border-fifth rounded-[12px] divide-y divide-fifth">
@@ -124,6 +132,7 @@ export const IdeasList: FC<{ scope: string; onPlanned?: () => void }> = ({ scope
                       })}
                     <span className="px-[6px] rounded-[6px] border border-fifth">{t(`topic_${i.topic.toLowerCase().replace(/[^a-z]+/g, '_')}`, i.topic)}</span>
                     {i.pillars.map((p) => <span key={p} className="px-[6px] rounded-[6px] border border-[#612BD3]/30 text-[#5221b8] dark:text-[#c4b5fd]">{p}</span>)}
+                    {isTrend(i) && <span className="px-[6px] rounded-[6px] border border-fifth">{t('trend_on_day', 'Trend · {day}').replace('{day}', new Date(i.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))}</span>}
                     {i.format && <span className="px-[6px] rounded-[6px] border border-fifth">{t(`format_${i.format.toLowerCase()}`, i.format)}</span>}
                     {status === 'ALL' && <span className="px-[6px] rounded-[6px] border border-fifth">{t(`idea_status_${i.status.toLowerCase()}`, LABEL[i.status])}</span>}
                   </div>
