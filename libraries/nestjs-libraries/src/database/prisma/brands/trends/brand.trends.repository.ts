@@ -28,16 +28,20 @@ export class BrandTrendsRepository {
     await this._prisma.model.$transaction([...upserts, removal]);
   }
 
-  async latestWeek(orgId: string, brandIds: string[]): Promise<Date | null> {
-    if (!brandIds.length) return null;
-    const r = await this._prisma.model.brandTrend.findFirst({
-      where: { orgId, customerId: { in: brandIds } }, orderBy: { week: 'desc' }, select: { week: true },
+  // Each brand's own newest week that has rows.
+  async latestWeeks(orgId: string, brandIds: string[]): Promise<Map<string, Date>> {
+    if (!brandIds.length) return new Map();
+    const r = await this._prisma.model.brandTrend.groupBy({
+      by: ['customerId'], where: { orgId, customerId: { in: brandIds } }, _max: { week: true },
     });
-    return r?.week || null;
+    return new Map(r.filter((x) => x._max.week).map((x) => [x.customerId, x._max.week as Date]));
   }
 
-  rows(orgId: string, week: Date, brandIds: string[]) {
-    return this._prisma.model.brandTrend.findMany({ where: { orgId, week, customerId: { in: brandIds } }, orderBy: { score: 'desc' } });
+  rowsOf(orgId: string, weeks: Map<string, Date>) {
+    if (!weeks.size) return Promise.resolve([]);
+    return this._prisma.model.brandTrend.findMany({
+      where: { orgId, OR: [...weeks].map(([customerId, week]) => ({ customerId, week })) }, orderBy: { score: 'desc' },
+    });
   }
 
   row(orgId: string, id: string) {

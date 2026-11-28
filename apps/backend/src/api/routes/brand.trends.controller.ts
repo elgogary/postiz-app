@@ -35,6 +35,7 @@ export class BrandTrendsController {
     if (!isOrgAdmin(orgRoleOf(org))) throw new ForbiddenException('Only an organization admin can run trends');
     const brandId = body?.brandId;
     if (brandId !== undefined && (typeof brandId !== 'string' || !TREND_ID.test(brandId))) throw new BadRequestException('Invalid brand');
+    if (this._trends.isRunning(org.id)) return { started: false };
     this._trends.run(org.id, brandId).then(
       (res) => this._log.log(`Trends run: ${res.filter((r) => !r.skipped).length} brands, ${res.reduce((n, r) => n + (r.trends || 0), 0)} trends`),
       (e) => this._log.error(`Trends run failed: ${(e as Error)?.message}`),

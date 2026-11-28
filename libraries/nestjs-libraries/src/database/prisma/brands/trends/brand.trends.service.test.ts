@@ -34,8 +34,12 @@ function setup(opts: { role?: string; rows?: Record<string, unknown>[]; plan?: u
   const repo = {
     orgsWithPillars: async () => ['o', 'o2'],
     saveWeek: async (...a: unknown[]) => { calls.push(['saveWeek', ...a]); },
-    latestWeek: async (_o: string, ids: string[]) => { calls.push(['latestWeek', ids]); return rows.some((r) => ids.includes(r.customerId as string)) ? WEEK : null; },
-    rows: async (_o: string, _w: Date, ids: string[]) => rows.filter((r) => ids.includes(r.customerId as string)),
+    latestWeeks: async (_o: string, ids: string[]) => {
+      const m = new Map<string, Date>();
+      for (const r of rows) if (ids.includes(r.customerId as string) && (!m.has(r.customerId as string) || m.get(r.customerId as string)! < (r.week as Date))) m.set(r.customerId as string, r.week as Date);
+      return m;
+    },
+    rowsOf: async (_o: string, weeks: Map<string, Date>) => rows.filter((r) => weeks.get(r.customerId as string)?.getTime() === (r.week as Date).getTime()),
     row: async (_o: string, id: string) => rows.find((r) => r.id === id) || null,
     claimIdea: async (_o: string, id: string, ideaId: string) => {
       calls.push(['claimIdea', id, ideaId]);
@@ -226,4 +230,47 @@ test('parsePlan and parseClusters clamp and drop invalid entries', () => {
   assert.deepEqual([c[1].kind, c[1].bullets.length], ['topic', 3]);
   assert.equal(parseClusters('{"x":1}'), null);
   assert.equal(parseClusters('```json\n[]\n```')!.length, 0);
+});
+
+test('list: each brand shows its own latest week; the page week is the newest', async () => {
+  const LAST = new Date('2026-11-15T00:00:00Z');
+  const s = setup({ rows: [trendRow({ id: 'a1', score: 10 }), trendRow({ id: 'a0', score: 99, week: LAST }), trendRow({ id: 'b0', customerId: 'opt', score: 60, week: LAST }), trendRow({ id: 'b00', customerId: 'opt', score: 70, week: new Date('2026-11-08T00:00:00Z') })] });
+  const r = await s.svc.list(...s.args, 'all');
+  assert.deepEqual(r.trends.map((t) => t.id), ['b0', 'a1']);
+  assert.equal(r.week, WEEK.toISOString());
+  assert.deepEqual((await s.svc.list(...s.args, 'opt')).trends.map((t) => t.id), ['b0']);
+});
+
+test('run: a second run for the same org at once is skipped; a later run works', async () => {
+  const s = setup();
+  const first = s.svc.run('o');
+  assert.equal(s.svc.isRunning('o'), true);
+  assert.deepEqual(await s.svc.run('o'), [{ brand: '', trends: 0, skipped: 'a run is already in progress' }]);
+  assert.equal((await first).length, 1);
+  assert.equal(s.svc.isRunning('o'), false);
+  assert.deepEqual(await s.svc.run('o'), [{ brand: 'Acme', trends: 1 }]);
+});
+
+test('run without an org skips an org already running', async () => {
+  const s = setup();
+  const first = s.svc.run('o');
+  const all = await s.svc.run();
+  assert.equal(all.length, 1);
+  await first;
+});
+
+test('only http and https links are kept', async () => {
+  const s = setup({ sources: { newsItems: async () => [
+    { title: 'a', url: 'javascript:alert(1)', source: 'S', date: recent }, { title: 'b', url: 'HTTPS://ok/1', source: 'S', date: recent },
+    { title: 'c', url: 'ftp://x/1', source: 'S', date: recent }, { title: 'd', url: 'http://ok/2', source: 'S', date: recent }] } });
+  await s.svc.run('o');
+  const items = ((s.calls.find((c) => c[0] === 'cluster')![1]) as { items: { title: string }[] }).items;
+  assert.deepEqual(items.map((i) => i.title).sort(), ['b', 'd']);
+});
+
+test('a failed news source is not asked again for the same brand', async () => {
+  let n = 0;
+  const s = setup({ plan: { ...plan, newsQueries: ['q1', 'q2', 'q3'] }, sources: { newsItems: async () => { n++; throw new Error('Source answered 429'); } } });
+  await s.svc.run('o');
+  assert.equal(n, 1);
 });

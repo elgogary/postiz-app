@@ -33,6 +33,7 @@ const MAX_FOUND = 120;
 const MAX_SHOWN = 6;
 const TEXT_CAP = 3000;
 const HN_MIN_POINTS = 100;
+const WEB_LINK = /^https?:\/\//i;
 const FEEDS = ['TECHNOLOGY', 'BUSINESS'];
 
 const plain = (html: string | null | undefined) =>
@@ -51,18 +52,26 @@ export class BrandTrendsService {
   sources: TrendSources = LIVE;
   now: () => Date = () => new Date();
   private readonly _saving = new Set<string>();
+  private readonly _running = new Set<string>();
+
+  isRunning(orgId: string) { return this._running.has(orgId); }
 
   constructor(private _brands: BrandsService, private _brandsRepo: BrandsRepository, private _repo: BrandTrendsRepository,
     private _ideas: BrandIdeasRepository, private _ai: TrendAi) {}
 
   async run(orgId?: string, brandId?: string): Promise<RunResult[]> {
+    if (orgId && this._running.has(orgId)) return [{ brand: '', trends: 0, skipped: 'a run is already in progress' }];
     const orgs = orgId ? [orgId] : await this._repo.orgsWithPillars();
     const out: RunResult[] = [];
     for (const org of orgs) {
+      if (this._running.has(org)) continue;
+      this._running.add(org);
       try {
         for (const brand of (await this._brandsRepo.customers(org)).filter((b) => !brandId || b.id === brandId)) out.push(await this.runBrand(org, brand));
       } catch (e) {
         this._log.warn(`Trends: an organization was skipped (${reason(e)})`);
+      } finally {
+        this._running.delete(org);
       }
     }
     return out;
@@ -83,6 +92,7 @@ export class BrandTrendsService {
       if (!plan) return skip('no search plan from the AI');
       const failed = new Set<string>();
       const safe = async <T>(source: string, fn: () => Promise<T>, empty: T): Promise<T> => {
+        if (source === 'news' && failed.has(source)) return empty;
         try { return await fn(); } catch (e) {
           if (!failed.has(source)) { failed.add(source); this._log.warn(`Trends: ${brand.name}: source ${source} ${reason(e)}`); }
           return empty;
@@ -115,7 +125,7 @@ export class BrandTrendsService {
     const out: Found[] = [];
     const seen = new Set<string>();
     const add = (i: Omit<Found, 'id'>) => {
-      if (!i.title || !i.url || seen.has(i.url)) return;
+      if (!i.title || !i.url || !WEB_LINK.test(i.url) || seen.has(i.url)) return;
       seen.add(i.url);
       out.push({ ...i, id: `n${out.length + 1}` });
     };
@@ -177,9 +187,10 @@ export class BrandTrendsService {
     const brands = (await this._brands.list(orgId, userId, orgRole)) as Brand[];
     if (scope !== 'all' && !brands.some((b) => b.id === scope)) throw new NotFoundException('Brand not found');
     const visible = scope === 'all' ? brands : brands.filter((b) => b.id === scope);
-    const week = await this._repo.latestWeek(orgId, visible.map((b) => b.id));
-    if (!week) return { week: null, trends: [] };
-    const rows = await this._repo.rows(orgId, week, visible.map((b) => b.id));
+    const weeks = await this._repo.latestWeeks(orgId, visible.map((b) => b.id));
+    if (!weeks.size) return { week: null, trends: [] };
+    const week = new Date(Math.max(...[...weeks.values()].map((w) => w.getTime())));
+    const rows = await this._repo.rowsOf(orgId, weeks);
     const brandOf = new Map(visible.map((b) => [b.id, b]));
     const trends = rows.filter((r) => brandOf.has(r.customerId)).map((r): TrendView => {
       const b = brandOf.get(r.customerId)!;
