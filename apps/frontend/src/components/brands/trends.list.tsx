@@ -5,9 +5,11 @@ import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 
 import Link from 'next/link';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { trendParts, type TrendItem, type TrendView } from '@gitroom/helpers/brands/trend.rules';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { roundParts, trendParts, type TrendItem, type TrendView } from '@gitroom/helpers/brands/trend.rules';
 import { BrandSummary, TrendsData, dirOf, errorText, useBrandsApi } from './brands.api';
-import { Retry, Skeleton, TD, TH, Text } from './brand.email.ui';
+import { Retry, Skeleton, TD as TDBASE, TH, Text } from './brand.email.ui';
+import { IdeaPlan } from './idea.plan';
 
 const COLORS = ['#3b5bdb', '#0b7285', '#2b8a3e', '#c2255c', '#b35c00', '#5f3dc4'];
 const initials = (name: string) => name.split(/\s+/).filter((w) => /\p{L}/u.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -19,6 +21,7 @@ const SOURCES: [TrendItem['kind'], string, string][] = [
   ['linkedin', 'source_linkedin', 'LinkedIn'], ['tiktok', 'source_tiktok', 'TikTok'],
 ];
 const DAY = 86400000;
+const TD = TDBASE.replace('h-[60px]', '').replace(/\s+/g, ' ').trim();
 
 const has = (v: TrendView, kind: TrendItem['kind']) => {
   const n = v.items.some((i) => i.kind === kind);
@@ -44,6 +47,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
   const t = useT();
   const api = useBrandsApi();
   const { show } = useToaster();
+  const modals = useModals();
   const [data, setData] = useState<TrendsData | null>(null);
   const [all, setAll] = useState<BrandSummary[]>([]);
   const [failed, setFailed] = useState('');
@@ -51,6 +55,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
   const [brand, setBrand] = useState('');
   const [open, setOpen] = useState('');
   const [busy, setBusy] = useState('');
+  const [fresh, setFresh] = useState<Record<string, string>>({});
   const seq = useRef(0);
   const tt = useRef(t);
   tt.current = t;
@@ -62,7 +67,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
     return api.trends(scope).then((d) => { if (mine === seq.current) setData(d); })
       .catch((e) => { if (mine === seq.current) setFailed(errorText(e, tt.current)); });
   }, [api, scope]);
-  useEffect(() => { setData(null); setSource(''); setBrand(''); setOpen(''); load(); return () => { seq.current += 1; }; }, [load]);
+  useEffect(() => { setData(null); setSource(''); setBrand(''); setOpen(''); setFresh({}); load(); return () => { seq.current += 1; }; }, [load]);
   useEffect(() => { if (page) api.list().then(setAll).catch(() => setAll([])); }, [api, page]);
 
   const trends = data?.trends || [];
@@ -83,8 +88,23 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
     setBusy(v.id);
     try {
       const r = await api.saveTrend(v.id);
-      setData({ ...data, trends: data.trends.map((x) => (x.id === v.id ? { ...x, ideaId: r.ideaId } : x)) });
+      setData((d) => d && { ...d, trends: d.trends.map((x) => (x.id === v.id ? { ...x, ideaId: r.ideaId } : x)) });
+      setFresh((f) => ({ ...f, [v.id]: r.ideaId }));
       show(t('trend_saved', 'Saved to Ideas'), 'success');
+    } catch (e) { show(errorText(e, t), 'warning'); }
+    setBusy('');
+  };
+  const planIt = async (v: TrendView) => {
+    setBusy(v.id);
+    try {
+      const ideas = await api.ideas(v.brandId);
+      const idea = ideas.ideas.find((i) => i.id === fresh[v.id]);
+      if (!idea) throw new Error('missing');
+      modals.openModal({
+        title: t('plan_this_idea', 'Plan this idea'), closeOnClickOutside: false, closeOnEscape: true,
+        children: (close: () => void) => <IdeaPlan data={ideas} idea={idea} brandId={v.brandId} close={close}
+          onDone={() => setFresh((f) => { const { [v.id]: _gone, ...rest } = f; return rest; })} />,
+      });
     } catch (e) { show(errorText(e, t), 'warning'); }
     setBusy('');
   };
@@ -98,18 +118,24 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
       out.push([v.thisWeek > 0 ? `${t('source_news', 'News')} ${v.thisWeek}${v.capped ? '+' : ''}` : t('source_news', 'News'),
         v.signals.outlets > 0 ? `${v.signals.outlets} ${t('outlets', 'outlets')}` : ''].filter(Boolean).join(' · '));
     }
-    if (has(v, 'github')) out.push(`${t('source_github', 'GitHub')} ${list('github').length} ${t('repos', 'repos')} · ${num(v.signals.topRepoStars)} ${t('stars', 'stars')}`);
+    if (has(v, 'github')) {
+      const n = list('github').length;
+      out.push([`${t('source_github', 'GitHub')}${n > 0 ? ` ${n} ${t('repos', 'repos')}` : ''}`, `${num(v.signals.topRepoStars)} ${t('stars', 'stars')}`].join(n > 0 ? ' · ' : ' '));
+    }
     if (has(v, 'hn')) out.push(`${t('source_hn', 'Hacker News')} ${num(v.signals.hnPoints)} ${t('points', 'points')}`);
-    if (has(v, 'linkedin')) out.push(`${t('source_linkedin', 'LinkedIn')} ${list('linkedin').length} ${t('posts', 'posts')} · ${num(v.signals.linkedinReactions)} ${t('reactions', 'reactions')}`);
+    if (has(v, 'linkedin')) {
+      const n = list('linkedin').length;
+      out.push([`${t('source_linkedin', 'LinkedIn')}${n > 0 ? ` ${n} ${t('posts', 'posts')}` : ''}`, `${num(v.signals.linkedinReactions)} ${t('reactions', 'reactions')}`].join(n > 0 ? ' · ' : ' '));
+    }
     list('tiktok').slice(0, 2).forEach((i) => out.push(`${t('source_tiktok', 'TikTok')} ${i.title}`));
     return out;
   };
   const growth = (v: TrendView) => (v.growth === null ? t('trend_new', 'New') : `+${Math.round(v.growth * 100)}%${v.capped ? ` ${t('or_more', 'or more')}` : ''}`);
   const parts = (v: TrendView) => {
-    const p = trendParts({ ...v.signals, growth: v.growth });
+    const p = roundParts(trendParts({ ...v.signals, growth: v.growth }));
     return t('trend_score_line', 'Growth {g} + engagement {e} + spread {s} + freshness {f} = {n}')
-      .replace('{g}', String(Math.round(p.growth))).replace('{e}', String(Math.round(p.engagement)))
-      .replace('{s}', String(Math.round(p.spread))).replace('{f}', String(Math.round(p.freshness))).replace('{n}', String(v.score));
+      .replace('{g}', String(p.growth)).replace('{e}', String(p.engagement))
+      .replace('{s}', String(p.spread)).replace('{f}', String(p.freshness)).replace('{n}', String(v.score));
   };
 
   return (
@@ -131,6 +157,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
         </div>
         <span className="ms-auto text-[13px] text-customColor18">{t('trends_week', 'Week of {from} to {to}').replace('{from}', from).replace('{to}', to)}</span>
       </div>
+      {failed && <Retry text={failed} onRetry={load} />}
       <div className="bg-sixth border border-fifth rounded-[12px] overflow-x-auto">
         <table className="w-full min-w-[960px] table-fixed border-collapse text-[13px]">
           <colgroup>
@@ -150,29 +177,34 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
               return (
                 <Fragment key={v.id}>
                   <tr className="cursor-pointer align-top" onClick={() => setOpen(isOpen ? '' : v.id)}>
-                    <td className={`${TD} h-auto align-top`}>
+                    <td className={`${TD} align-top`}>
                       <button className="block text-start font-[600] text-[14px]" aria-expanded={isOpen} onClick={(e) => { e.stopPropagation(); setOpen(isOpen ? '' : v.id); }}><Text text={v.title} /></button>
                       <span className="block text-[12px] text-customColor18">{v.kind.toLowerCase() === 'story' ? t('kind_story', 'Story') : t('kind_topic', 'Topic')}</span>
                     </td>
                     {page && (
-                      <td className={`${TD} h-auto align-top`}>
+                      <td className={`${TD} align-top`}>
                         <span className="inline-flex items-center gap-[6px]">
                           <span role="img" aria-label={v.brandName} className="w-[24px] h-[24px] rounded-full text-white text-[10px] font-[700] flex items-center justify-center" style={{ background: colorOf(v.brandId) }}>{initials(v.brandName)}</span>
                           <Text text={v.brandName} />
                         </span>
                       </td>
                     )}
-                    <td className={`${TD} h-auto align-top text-[20px] font-[600] tabular-nums`}>{v.score}</td>
-                    <td className={`${TD} h-auto align-top`}>
+                    <td className={`${TD} align-top text-[20px] font-[600] tabular-nums`}>{v.score}</td>
+                    <td className={`${TD} align-top`}>
                       <span className="block font-[600]">{growth(v)}</span>
                       <span className="block text-[12px] text-customColor18">{t('trend_basis', '{n} articles; 4-week average {a}').replace('{n}', `${v.thisWeek}${v.capped ? '+' : ''}`).replace('{a}', trim(v.average))}</span>
                     </td>
-                    <td className={`${TD} h-auto align-top`}>
+                    <td className={`${TD} align-top`}>
                       <div className="flex flex-wrap gap-[6px]">{where(v).map((w) => <span key={w} className="px-[6px] rounded-[6px] border border-fifth text-[12px]"><Text text={w} /></span>)}</div>
                     </td>
-                    <td className={`${TD} h-auto align-top`}>{v.pillar && <span className="px-[6px] rounded-[6px] border border-[#612BD3]/30 text-[12px] text-[#5221b8] dark:text-[#c4b5fd]"><Text text={v.pillar} /></span>}</td>
-                    <td className={`${TD} h-auto align-top text-end`} onClick={(e) => e.stopPropagation()}>
-                      {v.ideaId ? (
+                    <td className={`${TD} align-top`}>{v.pillar && <span className="px-[6px] rounded-[6px] border border-[#612BD3]/30 text-[12px] text-[#5221b8] dark:text-[#c4b5fd]"><Text text={v.pillar} /></span>}</td>
+                    <td className={`${TD} align-top text-end`} onClick={(e) => e.stopPropagation()}>
+                      {fresh[v.id] ? (
+                        <span className="inline-flex items-center gap-[8px]">
+                          <span className="text-[12px] text-customColor18">{t('saved', 'Saved')}</span>
+                          <button className={QUIET} disabled={busy === v.id} onClick={() => planIt(v)}>{t('plan_it', 'Plan it')}</button>
+                        </span>
+                      ) : v.ideaId ? (
                         <Link className="underline" href={`/brands?brand=${v.brandId}&tab=ideas`}>{t('saved_to_ideas', 'Saved to Ideas')}</Link>
                       ) : v.canSave ? (
                         <button className={QUIET} disabled={busy === v.id} onClick={() => save(v)}>{t('save_as_idea', 'Save as idea')}</button>

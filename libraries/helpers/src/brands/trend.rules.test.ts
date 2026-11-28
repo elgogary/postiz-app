@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { weekStart, growthOf, trendScore, trendParts, topicKey, MAX_TRENDS } from './trend.rules';
+import { weekStart, growthOf, trendScore, trendParts, roundParts, topicKey, MAX_TRENDS } from './trend.rules';
 
 const base = { hnPoints: 0, topRepoStars: 0, linkedinReactions: 0, outlets: 0, platforms: 1, freshShare: 0 };
 
@@ -56,4 +56,14 @@ test('parts: the four parts add up to the score', () => {
   const p = trendParts(i);
   assert.deepEqual([Math.round(p.growth), Math.round(p.engagement), Math.round(p.spread), Math.round(p.freshness)], [13, 0, 20, 20]);
   assert.equal(Math.round(p.growth + p.engagement + p.spread + p.freshness), trendScore(i));
+});
+
+test('roundParts: parts always add up to the rounded total', () => {
+  const naive = { growth: 10.6, engagement: 10.6, spread: 10.6, freshness: 10.4 };
+  assert.equal(Object.values(naive).reduce((a, v) => a + Math.round(v), 0), 43);
+  const r = roundParts(naive);
+  assert.equal(r.growth + r.engagement + r.spread + r.freshness, 42);
+  assert.deepEqual(r, { growth: 11, engagement: 11, spread: 10, freshness: 10 });
+  const q = roundParts(trendParts({ ...base, growth: 0.33, hnPoints: 239, topRepoStars: 928, outlets: 43, platforms: 3, freshShare: 1 }));
+  assert.equal(q.growth + q.engagement + q.spread + q.freshness, 65);
 });

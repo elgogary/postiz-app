@@ -37,6 +37,16 @@ export const trendParts = (i: TrendScoreInput) => ({
   freshness: 20 * part(i.freshShare, 1),
 });
 
+// Rounds the four parts so they always add up to round(total): floor each, then give the spare units to the largest remainders.
+export const roundParts = (p: ReturnType<typeof trendParts>): typeof p => {
+  const keys = Object.keys(p) as (keyof typeof p)[];
+  const target = Math.round(keys.reduce((a, k) => a + p[k], 0));
+  const out = Object.fromEntries(keys.map((k) => [k, Math.floor(p[k])])) as typeof p;
+  let spare = target - keys.reduce((a, k) => a + out[k], 0);
+  [...keys].sort((a, b) => (p[b] - Math.floor(p[b])) - (p[a] - Math.floor(p[a]))).forEach((k) => { if (spare > 0) { out[k] += 1; spare -= 1; } });
+  return out;
+};
+
 export const trendScore = (i: TrendScoreInput): number => {
   const p = trendParts(i);
   return Math.round(p.growth + p.engagement + p.spread + p.freshness);
