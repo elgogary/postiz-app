@@ -200,7 +200,11 @@ async function getFeed(url: string, f: FetchFn): Promise<string> {
 }
 
 // items of the last 7 days from every feed; one feed failing never fails the others, and a throw only when all failed
-export async function securityNews(f: FetchFn = fetch, now: Date = new Date()): Promise<NewsItem[]> {
+export function securityNews(f: FetchFn = fetch, now: Date = new Date()): Promise<NewsItem[]> {
+  return once('security-news', f, () => loadSecurityNews(f, now));
+}
+
+async function loadSecurityNews(f: FetchFn, now: Date): Promise<NewsItem[]> {
   const cutoff = now.getTime() - 7 * DAY;
   const out: NewsItem[] = [];
   let failed = 0;
@@ -221,13 +225,33 @@ export const TRENDING_FEED = 'https://mshibanami.github.io/GitHubTrendingRSS/wee
 export const TRENDING_MAX = 15;
 const TRENDING_PARALLEL = 4;
 
-// <title> is "owner/repo", <link> the repo URL; the description (README text) is never kept
+// <title> is "owner/repo", <link> the repo URL; the description (README text) is never kept. A name segment of "." or
+// ".." is refused: the name goes into the API path, and a tampered feed must not walk to another API route
+const REPO_NAME = /^(?!\.\.?\/)[\w-][\w.-]*\/(?!\.\.?$)[\w.-]+$/;
 export function parseTrendingRss(xml: string): { name: string; url: string }[] {
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map((m) => ({ name: tag(m[1], 'title'), url: tag(m[1], 'link') }))
-    .filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r.name) && r.url === `https://github.com/${r.name}`);
+    .filter((r) => REPO_NAME.test(r.name) && r.url === `https://github.com/${r.name}`);
 }
 
-export async function githubTrending(f: FetchFn = fetch): Promise<GithubRepo[]> {
+// the security news and the trending list are the same for every brand: one fetch serves a whole run (30 minutes);
+// an injected fetch (tests) always reads fresh
+const SHARED_TTL_MS = 30 * 60 * 1000;
+const shared = new Map<string, { at: number; value: Promise<unknown> }>();
+function once<T>(key: string, f: FetchFn, load: () => Promise<T>): Promise<T> {
+  if (f !== fetch) return load();
+  const hit = shared.get(key);
+  if (hit && Date.now() - hit.at < SHARED_TTL_MS) return hit.value as Promise<T>;
+  const value = load();
+  shared.set(key, { at: Date.now(), value });
+  value.catch(() => shared.delete(key));
+  return value;
+}
+
+export function githubTrending(f: FetchFn = fetch): Promise<GithubRepo[]> {
+  return once('github-trending', f, () => loadGithubTrending(f));
+}
+
+async function loadGithubTrending(f: FetchFn): Promise<GithubRepo[]> {
   const repos = parseTrendingRss(await getText(TRENDING_FEED, f)).slice(0, TRENDING_MAX);
   const token = env('GITHUB_TOKEN');
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };

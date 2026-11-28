@@ -294,6 +294,13 @@ test('parseTrendingRss keeps titles and links only and drops odd entries', () =>
   ]);
 });
 
+test('parseTrendingRss refuses "." and ".." segments, so a tampered feed cannot walk the API path', () => {
+  const feed = (name: string) => `<rss><channel><item><title>${name}</title><link>https://github.com/${name}</link></item></channel></rss>`;
+  for (const bad of ['../user', '../..', 'owner/..', 'owner/.', './repo', '.hidden/repo']) assert.deepEqual(parseTrendingRss(feed(bad)), [], bad);
+  assert.equal(parseTrendingRss(feed('owner/repo.js')).length, 1);
+  assert.equal(parseTrendingRss(feed('owner-1/.github')).length, 1);
+});
+
 test('githubTrending looks up stars officially, token only when set, failure keeps 0', async () => {
   const seen: [string, any][] = [];
   const f = (async (u: string, init: any) => {

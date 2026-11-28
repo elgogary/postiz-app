@@ -348,7 +348,7 @@ test('plan.security adds security items (no metric, source = the site); plan.tec
   const sec = row.items.filter((i: any) => i.kind === 'security');
   assert.deepEqual(sec.map((i: any) => [i.source, i.metric]), [['Site A', undefined], ['Site B', undefined]]);
   const gh = row.items.filter((i: any) => i.kind === 'github');
-  assert.deepEqual(gh.map((i: any) => [i.title, i.source, i.metric]), [['o/r: A small tool', 'GitHub trending', '1200 stars'], ['o/q', 'GitHub trending', '0 stars']]);
+  assert.deepEqual(gh.map((i: any) => [i.title, i.source, i.metric]), [['o/r · A small tool', 'GitHub trending', '1200 stars'], ['o/q', 'GitHub trending', '0 stars']]);
   assert.equal(row.signals.topRepoStars, 1200);
   assert.equal(row.signals.securitySites, 2);
 });

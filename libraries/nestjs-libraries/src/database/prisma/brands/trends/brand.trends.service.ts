@@ -159,7 +159,7 @@ export class BrandTrendsService {
     }
     if (plan.tech) {
       for (const r of await safe('github-trending', () => s.githubTrending(), [])) {
-        add({ title: r.description ? `${r.name}: ${r.description}` : r.name, url: r.url, source: 'GitHub trending', date: r.created, kind: 'github', metric: `${r.stars} stars`, n: r.stars });
+        add({ title: r.description ? `${r.name} · ${r.description}` : r.name, url: r.url, source: 'GitHub trending', date: r.created, kind: 'github', metric: `${r.stars} stars`, n: r.stars });
       }
     }
     for (const k of plan.linkedinKeywords) for (const p of await safe('linkedin', () => s.linkedinPosts(k), [])) {
