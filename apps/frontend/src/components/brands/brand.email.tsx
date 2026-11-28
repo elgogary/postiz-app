@@ -45,7 +45,7 @@ export const BrandEmail: FC<{
   // A deep link to a campaign shows its own report at once; it does not wait for the overview.
   const [kind, channelId, rawId] = focus.split(':');
   if (kind === 'c' && channelId && +rawId) {
-    return <BrandEmailReport brandId={brandId} channelId={channelId} campaignId={+rawId} go={go} />;
+    return <BrandEmailReport brandId={brandId} brandName={brandName} channelId={channelId} campaignId={+rawId} go={go} />;
   }
   if (error && !data) return <Retry text={error} onRetry={load} />;
   if (!data) return <Skeleton />;

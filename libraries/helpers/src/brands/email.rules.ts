@@ -45,6 +45,12 @@ export const CONSENT_TAGS: Record<Exclude<ConsentKind, 'none'>, string> = { agre
 export const consentOf = (tags: string[] | null | undefined): ConsentKind =>
   tags?.includes(CONSENT_TAGS.team) ? 'team' : tags?.includes(CONSENT_TAGS.agreed) ? 'agreed' : 'none';
 
+// A brand's Listmonk lists are named "<Brand>: <list>"; inside the brand's own tab the brand part is left out.
+export const listLabel = (name: string, brand: string) => {
+  const prefix = `${brand}: `;
+  return name.startsWith(prefix) && name.length > prefix.length ? name.slice(prefix.length) : name;
+};
+
 // The tag the Hub puts on every email it sends (X-Mailin-Tag header), so the relay's report can be read per email.
 export const hubTag = (postId: string) => `hub-${postId}`;
 

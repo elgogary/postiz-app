@@ -4,6 +4,7 @@
 import { FC, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { EmailListRow } from '@gitroom/helpers/brands/email.rules';
+import { listLabel } from '@gitroom/helpers/brands/email.rules';
 import { errorText, useBrandsApi } from './brands.api';
 import { QUIET, Text } from './brand.email.ui';
 
@@ -43,7 +44,7 @@ export const EmailImportModal: FC<{ brandId: string; brandName: string; lists: E
       <label className="flex flex-col gap-[8px] text-[13px] font-[600]">
         {t('email_import_list', 'List')}
         <select value={at} onChange={(e) => setAt(e.target.value)} className="min-h-[36px] bg-input border border-fifth rounded-[8px] px-[8px] font-[400]">
-          {lists.map((l) => <option key={`${l.channelId}:${l.id}`} value={`${l.channelId}:${l.id}`}>{l.name}</option>)}
+          {lists.map((l) => <option key={`${l.channelId}:${l.id}`} value={`${l.channelId}:${l.id}`}>{listLabel(l.name, brandName)}</option>)}
         </select>
       </label>
       <label className="flex flex-col gap-[8px] text-[13px] font-[600]">

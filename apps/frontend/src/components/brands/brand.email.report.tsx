@@ -6,6 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import type { EmailReport, HistoryStep, Rate } from '@gitroom/helpers/brands/email.rules';
+import { listLabel } from '@gitroom/helpers/brands/email.rules';
 import { errorText, useBrandsApi } from './brands.api';
 import { CARD, EmailGo, fmtAt, pctText, QUIET, Retry, Skeleton, StateChip, Text } from './brand.email.ui';
 
@@ -34,7 +35,7 @@ const Rows: FC<{ title: string; className?: string; rows: [ReactNode, number | s
   </div>
 );
 
-export const BrandEmailReport: FC<{ brandId: string; channelId: string; campaignId: number; go: EmailGo }> = ({ brandId, channelId, campaignId, go }) => {
+export const BrandEmailReport: FC<{ brandId: string; brandName: string; channelId: string; campaignId: number; go: EmailGo }> = ({ brandId, brandName, channelId, campaignId, go }) => {
   const t = useT();
   const api = useBrandsApi();
   const modals = useModals();
@@ -96,7 +97,7 @@ export const BrandEmailReport: FC<{ brandId: string; channelId: string; campaign
       </div>
       <div className="text-[13px] text-customColor18">
         {t('email_sent_on', 'Sent')} <b className="font-[500] text-textColor">{fmtAt(row.at)}</b>
-        {rep.lists.length > 0 && <> · {t('email_list', 'List')} {rep.lists.map((l, i) => <b key={l.id} className="font-[500] text-textColor">{i > 0 && ', '}<Text text={l.name} /></b>)}</>}
+        {rep.lists.length > 0 && <> · {t('email_list', 'List')} {rep.lists.map((l, i) => <b key={l.id} className="font-[500] text-textColor">{i > 0 && ', '}<Text text={listLabel(l.name, brandName)} /></b>)}</>}
         {rep.from && <> · {t('email_from', 'From')} <b className="font-[500] text-textColor" dir="ltr">{rep.from}</b></>}
       </div>
       {row.subject && <div className="text-[13px] text-customColor18">{t('email_subject', 'Subject')} <b className="font-[500] text-textColor"><Text text={row.subject} /></b></div>}
