@@ -41,6 +41,11 @@ test('a list shows without its brand prefix inside the brand', () => {
   assert.equal(listLabel('Brand B: newsletter', 'Brand A'), 'Brand B: newsletter');
   assert.equal(listLabel('Brand A newsletter', 'Brand A'), 'Brand A newsletter');
   assert.equal(listLabel('Brand A: ', 'Brand A'), 'Brand A: ');
+  assert.equal(listLabel('Brand A:    ', 'Brand A'), 'Brand A:    ');
+  assert.equal(listLabel('Brand A:   x', 'Brand A'), 'x');
+  assert.equal(listLabel('Brand AB: x', 'Brand A'), 'Brand AB: x');
+  assert.equal(listLabel(': x', ''), ': x');
+  assert.equal(listLabel(': x', '  '), ': x');
 });
 
 test('an unsubscribe goes to the latest campaign sent to its list before it', () => {
