@@ -6,7 +6,7 @@ import OpenAI from 'openai';
 
 export interface TrendPlan {
   language: 'ar' | 'en'; country: string; newsQueries: string[]; tech: boolean; githubQueries: string[];
-  linkedinKeywords: string[]; tiktok: { country: string; industry: string } | null;
+  linkedinKeywords: string[]; videoKeywords: string[]; tiktok: { country: string; industry: string } | null;
 }
 export interface PlanInput { brand: string; summary: string; voice: string; pillars: string[] }
 export interface ClusterItem { id: string; kind: string; title: string; source: string; metric?: string }
@@ -19,6 +19,7 @@ export interface Cluster {
 export const MAX_NEWS_QUERIES = 4;
 export const MAX_GITHUB_QUERIES = 3;
 export const MAX_LINKEDIN_KEYWORDS = 3;
+export const MAX_VIDEO_KEYWORDS = 3;
 export const MAX_TOPICS = 10;
 
 const str = (v: unknown, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -43,6 +44,7 @@ export function planPrompt(i: PlanInput) {
     'tech: true only when the audience follows software, AI or developer news, otherwise false.',
     `githubQueries: at most ${MAX_GITHUB_QUERIES} short English keywords to search new code repositories, empty unless tech is true.`,
     `linkedinKeywords: at most ${MAX_LINKEDIN_KEYWORDS} short keywords to search LinkedIn posts, in the language the audience posts in.`,
+    `videoKeywords: at most ${MAX_VIDEO_KEYWORDS} short phrases (60 characters at most) to search TikTok videos, mixing the brand\'s language and English, about the kind of short videos the brand makes. Ask for it only when the summary, voice or content mix shows the brand makes short videos (reels, TikTok, a video series), otherwise an empty list.`,
     'tiktok: {"country": two-letter code, "industry": one short English industry name} when the brand sells to consumers, otherwise null.',
   ].join('\n');
   const user = `Brand: ${i.brand}\n\nSummary:\n${i.summary}\n\nVoice:\n${i.voice}\n\nContent pillars:\n${i.pillars.map((p) => `- ${p}`).join('\n')}`;
@@ -64,13 +66,14 @@ export function parsePlan(text: string): TrendPlan | null {
     tech,
     githubQueries: tech ? strs(o.githubQueries, MAX_GITHUB_QUERIES) : [],
     linkedinKeywords: strs(o.linkedinKeywords, MAX_LINKEDIN_KEYWORDS),
+    videoKeywords: strs(o.videoKeywords, MAX_VIDEO_KEYWORDS, 60),
     tiktok: tc ? { country: tc, industry: str(t?.industry, 60) } : null,
   };
 }
 
 // a week can bring 300 items (150 LinkedIn posts alone): the prompt takes at most this many of each kind, in the order
 // found, so the answer stays complete (Moonsab's call failed on 28 Nov with every item in)
-export const PROMPT_QUOTA: Record<string, number> = { news: 60, linkedin: 30, hn: 15, github: 10, tiktok: 10 };
+export const PROMPT_QUOTA: Record<string, number> = { news: 60, linkedin: 30, hn: 15, github: 10, tiktok: 20 };
 export function promptItems<T extends { kind: string }>(items: T[]): T[] {
   const used: Record<string, number> = {};
   return items.filter((x) => (used[x.kind] = (used[x.kind] || 0) + 1) <= (PROMPT_QUOTA[x.kind] ?? 10));

@@ -67,3 +67,10 @@ test('roundParts: parts always add up to the rounded total', () => {
   const q = roundParts(trendParts({ ...base, growth: 0.33, hnPoints: 239, topRepoStars: 928, outlets: 43, platforms: 3, freshShare: 1 }));
   assert.equal(q.growth + q.engagement + q.spread + q.freshness, 65);
 });
+
+test('score: TikTok views count in the engagement term, older rows without the field count as 0', () => {
+  assert.equal(trendScore({ ...base, growth: null, tiktokViews: 250000 }), 10);
+  assert.equal(trendScore({ ...base, growth: null, tiktokViews: 5000000 }), 20);
+  assert.equal(trendScore({ ...base, growth: null }), trendScore({ ...base, growth: null, tiktokViews: 0 }));
+  assert.equal(trendParts({ ...base, growth: null, tiktokViews: 250000 }).engagement, 10);
+});

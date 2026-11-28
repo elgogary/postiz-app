@@ -4,7 +4,7 @@ export const MAX_TRENDS = 8;
 export const STRONG_SCORE = 30;
 
 export interface TrendSignals {
-  hnPoints: number; topRepoStars: number; linkedinReactions: number; outlets: number; platforms: number; freshShare: number;
+  hnPoints: number; topRepoStars: number; linkedinReactions: number; tiktokViews?: number; outlets: number; platforms: number; freshShare: number;
 }
 export interface TrendItem {
   title: string; url: string; source: string; date: string;
@@ -34,7 +34,7 @@ const part = (v: number, max = Infinity) => (Number.isFinite(v) ? Math.min(Math.
 
 export const trendParts = (i: TrendScoreInput) => ({
   growth: (40 * part(i.growth ?? 0, 2)) / 2,
-  engagement: 20 * Math.min(1, Math.max(part(i.hnPoints) / 300, part(i.topRepoStars) / 1000, part(i.linkedinReactions) / 500)),
+  engagement: 20 * Math.min(1, Math.max(part(i.hnPoints) / 300, part(i.topRepoStars) / 1000, part(i.linkedinReactions) / 500, part(i.tiktokViews ?? 0) / 500000)),
   spread: 20 * Math.min(1, part(i.outlets) / 40 + 0.25 * (Math.max(part(i.platforms), 1) - 1)),
   freshness: 20 * part(i.freshShare, 1),
 });

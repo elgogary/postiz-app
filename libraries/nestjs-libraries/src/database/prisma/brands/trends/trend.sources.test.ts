@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   decodeEntities, parseNewsRss, newsUrl, newsWindow, newsWeeks, mapHnItem, hackerNewsTop, githubUrl, mapGithub, githubNew,
   mapLinkedin, mapTiktok, linkedinInput, tiktokInput, linkedinPosts, tiktokHashtags, apifyRun, newsTopic,
+  mapTiktokVideos, tiktokVideosInput, tiktokVideos,
 } from './trend.sources';
 
 test('newsTopic follows one redirect on news.google.com only', async () => {
@@ -177,4 +178,41 @@ test('apifyRun error never carries the token', async () => {
   try {
     await assert.rejects(() => apifyRun('u~a', {}, (async () => res('no', 401)) as any), (e: Error) => !e.message.includes('secret-token') && /401/.test(e.message));
   } finally { delete process.env.APIFY_TOKEN; }
+});
+
+test('tiktok videos: mapping from the saved sample keeps no author field', () => {
+  const v = mapTiktokVideos(JSON.parse(fx('tiktok-videos.sample.json')));
+  assert.equal(v.length, 4);
+  assert.deepEqual(v[0], {
+    text: 'Sample caption 1 about building an app from an idea #sampletag', url: 'https://www.tiktok.com/@creator-1/video/1',
+    date: '2026-11-23T06:12:37.000Z', views: 33515, likes: 2446, shares: 450, comments: 15, sound: 'original sound - creator-1',
+  });
+  assert.deepEqual(Object.keys(v[0]), ['text', 'url', 'date', 'views', 'likes', 'shares', 'comments', 'sound']);
+  assert.equal(v[2].text, 'Sample caption 3 with odd spacing');
+  assert.equal(v[2].sound, '');
+  assert.equal(mapTiktokVideos([{ text: 'x'.repeat(500), webVideoUrl: 'https://t/1' }, { text: 'no url' }])[0].text.length, 200);
+});
+
+test('tiktok videos: input adds the proxy country only for a 2-letter code', () => {
+  const i = tiktokVideosInput('startup idea', 'sa');
+  assert.deepEqual([i.searchQueries, i.searchSection, i.resultsPerPage, i.videoSearchSorting, i.videoSearchDateFilter, i.proxyCountryCode], [['startup idea'], '/video', 20, 'MOST_LIKED', 'PAST_WEEK', 'SA']);
+  assert.equal(i.shouldDownloadVideos, false);
+  assert.ok(!('proxyCountryCode' in tiktokVideosInput('k', '')) && !('proxyCountryCode' in tiktokVideosInput('k', 'USA')));
+});
+
+test('tiktok videos reader skips without token or actor', async () => {
+  const keys = ['APIFY_TOKEN', 'APIFY_TREND_TIKTOK_VIDEOS_ACTOR'];
+  const old = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  let calls = 0;
+  const f = (async () => { calls++; return res(JSON.parse(fx('tiktok-videos.sample.json'))); }) as any;
+  try {
+    for (const k of keys) process.env[k] = '';
+    assert.deepEqual(await tiktokVideos('k', 'SA', f), []);
+    process.env.APIFY_TOKEN = 't';
+    assert.deepEqual(await tiktokVideos('k', 'SA', f), []);
+    assert.equal(calls, 0);
+    process.env.APIFY_TREND_TIKTOK_VIDEOS_ACTOR = 'u~a';
+    assert.equal((await tiktokVideos('k', 'SA', f)).length, 4);
+    assert.equal(calls, 1);
+  } finally { for (const k of keys) { if (old[k] === undefined) delete process.env[k]; else process.env[k] = old[k]; } }
 });

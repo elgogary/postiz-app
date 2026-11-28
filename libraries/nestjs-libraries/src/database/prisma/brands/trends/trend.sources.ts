@@ -7,6 +7,7 @@ export interface NewsWeek { count: number; outlets: number }
 export interface HnStory { title: string; url: string; points: number; comments: number; date: string }
 export interface GithubRepo { name: string; url: string; stars: number; description: string; created: string }
 export interface LinkedinPost { text: string; url: string; date: string; reactions: number; comments: number }
+export interface TiktokVideo { text: string; url: string; date: string; views: number; likes: number; shares: number; comments: number; sound: string }
 export interface TiktokTag { name: string; url: string; views: number; videos: number; trend: string; momentumPct: number | null }
 
 const TIMEOUT_MS = 20000;
@@ -199,5 +200,30 @@ export async function tiktokHashtags(country: string, industry: string, f: Fetch
   const actor = env('APIFY_TREND_TIKTOK_ACTOR');
   if (!env('APIFY_TOKEN') || !actor) return [];
   return mapTiktok(await apifyRun(actor, tiktokInput(country, industry), f));
+}
+
+// clockworks~tiktok-scraper, video search: text, webVideoUrl, createTimeISO, playCount, diggCount, shareCount, commentCount,
+// musicMeta.musicName. Author fields (authorMeta) are left out on purpose: a video is kept without who made it.
+export const mapTiktokVideos = (items: any[]): TiktokVideo[] =>
+  items.filter((v) => v && v.webVideoUrl).map((v) => ({
+    text: String(v.text || '').replace(/\s+/g, ' ').trim().slice(0, 200), url: String(v.webVideoUrl),
+    date: v.createTimeISO || (num(v.createTime) ? new Date(num(v.createTime) * 1000).toISOString() : ''),
+    views: num(v.playCount), likes: num(v.diggCount), shares: num(v.shareCount), comments: num(v.commentCount),
+    sound: String(v.musicMeta?.musicName || ''),
+  }));
+
+export const tiktokVideosInput = (keyword: string, country: string) => {
+  const input: Record<string, unknown> = {
+    searchQueries: [keyword], searchSection: '/video', resultsPerPage: 20, videoSearchSorting: 'MOST_LIKED', videoSearchDateFilter: 'PAST_WEEK',
+    shouldDownloadVideos: false, shouldDownloadCovers: false, shouldDownloadSlideshowImages: false, shouldDownloadAvatars: false, shouldDownloadMusicCovers: false,
+  };
+  if (/^[A-Za-z]{2}$/.test(country)) input.proxyCountryCode = country.toUpperCase();
+  return input;
+};
+
+export async function tiktokVideos(keyword: string, country: string, f: FetchFn = fetch): Promise<TiktokVideo[]> {
+  const actor = env('APIFY_TREND_TIKTOK_VIDEOS_ACTOR');
+  if (!env('APIFY_TOKEN') || !actor) return [];
+  return mapTiktokVideos(await apifyRun(actor, tiktokVideosInput(keyword, country), f));
 }
 // <<< SANAD-BRANDS

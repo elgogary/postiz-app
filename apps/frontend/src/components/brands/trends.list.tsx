@@ -29,6 +29,7 @@ const has = (v: TrendView, kind: TrendItem['kind']) => {
   if (kind === 'github') return n || v.signals.topRepoStars > 0;
   if (kind === 'hn') return n || v.signals.hnPoints > 0;
   if (kind === 'linkedin') return n || v.signals.linkedinReactions > 0;
+  if (kind === 'tiktok') return n || (v.signals.tiktokViews ?? 0) > 0;
   return n;
 };
 const num = (n: number) => n.toLocaleString('en-US');
@@ -132,7 +133,12 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
       const n = list('linkedin').length;
       out.push([`${t('source_linkedin', 'LinkedIn')}${n > 0 ? ` ${n} ${t('posts', 'posts')}` : ''}`, `${num(v.signals.linkedinReactions)} ${t('reactions', 'reactions')}`].join(n > 0 ? ' · ' : ' '));
     }
-    list('tiktok').slice(0, 2).forEach((i) => out.push(`${t('source_tiktok', 'TikTok')} ${i.title}`));
+    const videos = list('tiktok').filter((i) => i.url.includes('/video/'));
+    list('tiktok').filter((i) => !i.url.includes('/video/')).slice(0, 2).forEach((i) => out.push(`${t('source_tiktok', 'TikTok')} ${i.title}`));
+    if (videos.length > 0 || (v.signals.tiktokViews ?? 0) > 0) {
+      out.push([t('source_tiktok', 'TikTok'), videos.length > 0 ? `${videos.length} ${videos.length === 1 ? t('video', 'video') : t('videos', 'videos')}` : ''].filter(Boolean).join(' ') +
+        ((v.signals.tiktokViews ?? 0) > 0 ? ` · ${num(v.signals.tiktokViews ?? 0)} ${t('views', 'views')}` : ''));
+    }
     return out;
   };
   const growth = (v: TrendView) => (v.growth === null ? t('trend_new', 'New') : `${v.growth >= 0 ? '+' : ''}${Math.round(v.growth * 100)}%${v.capped ? ` ${t('or_more', 'or more')}` : ''}`);

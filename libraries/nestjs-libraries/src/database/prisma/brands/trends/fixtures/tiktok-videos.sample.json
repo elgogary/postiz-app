@@ -1,0 +1,165 @@
+[
+  {
+    "id": "1000000000000000001",
+    "text": "Sample caption 1 about building an app from an idea #sampletag",
+    "textLanguage": "en",
+    "createTimeISO": "2026-11-23T06:12:37.000Z",
+    "createTime": 1795414357,
+    "locationCreated": "US",
+    "isAd": false,
+    "authorMeta": {
+      "id": "creator-1-id",
+      "name": "creator-1",
+      "profileUrl": "https://www.tiktok.com/@creator-1",
+      "nickName": "creator-1",
+      "verified": false
+    },
+    "musicMeta": {
+      "musicName": "original sound - creator-1",
+      "musicAuthor": "creator-1",
+      "musicOriginal": true
+    },
+    "webVideoUrl": "https://www.tiktok.com/@creator-1/video/1",
+    "videoMeta": {
+      "height": 1280,
+      "width": 720,
+      "duration": 49.942
+    },
+    "diggCount": 2446,
+    "shareCount": 450,
+    "playCount": 33515,
+    "collectCount": 2762,
+    "commentCount": 15,
+    "repostCount": null,
+    "hashtags": [
+      {
+        "id": "1",
+        "name": "sampletag",
+        "title": null
+      }
+    ],
+    "isSlideshow": false,
+    "searchQuery": "sample keyword"
+  },
+  {
+    "id": "1000000000000000002",
+    "text": "Sample caption 2 about building an app from an idea #sampletag",
+    "textLanguage": "en",
+    "createTimeISO": "2026-11-22T12:00:00.000Z",
+    "createTime": 1795348800,
+    "locationCreated": "US",
+    "isAd": false,
+    "authorMeta": {
+      "id": "creator-2-id",
+      "name": "creator-2",
+      "profileUrl": "https://www.tiktok.com/@creator-2",
+      "nickName": "creator-2",
+      "verified": false
+    },
+    "musicMeta": {
+      "musicName": "original sound - creator-2",
+      "musicAuthor": "creator-2",
+      "musicOriginal": true
+    },
+    "webVideoUrl": "https://www.tiktok.com/@creator-2/video/2",
+    "videoMeta": {
+      "height": 1024,
+      "width": 576,
+      "duration": 120.934
+    },
+    "diggCount": 2154,
+    "shareCount": 1956,
+    "playCount": 82246,
+    "collectCount": 2803,
+    "commentCount": 1374,
+    "repostCount": null,
+    "hashtags": [
+      {
+        "id": "1",
+        "name": "sampletag",
+        "title": null
+      }
+    ],
+    "isSlideshow": false,
+    "searchQuery": "sample keyword"
+  },
+  {
+    "id": "1000000000000000003",
+    "text": "  Sample   caption\n 3 with\n   odd spacing  ",
+    "textLanguage": "en",
+    "createTimeISO": "2026-11-26T12:30:00.000Z",
+    "createTime": 1795696200,
+    "locationCreated": "US",
+    "isAd": false,
+    "authorMeta": {
+      "id": "creator-3-id",
+      "name": "creator-3",
+      "profileUrl": "https://www.tiktok.com/@creator-3",
+      "nickName": "creator-3",
+      "verified": false
+    },
+    "webVideoUrl": "https://www.tiktok.com/@creator-3/video/3",
+    "videoMeta": {
+      "height": 1024,
+      "width": 576,
+      "duration": 148.367
+    },
+    "diggCount": 6858,
+    "shareCount": 3600,
+    "playCount": 223698,
+    "collectCount": 6301,
+    "commentCount": 983,
+    "repostCount": null,
+    "hashtags": [
+      {
+        "id": "1",
+        "name": "sampletag",
+        "title": null
+      }
+    ],
+    "isSlideshow": false,
+    "searchQuery": "sample keyword"
+  },
+  {
+    "id": "1000000000000000004",
+    "text": "",
+    "textLanguage": "en",
+    "createTimeISO": "2026-11-23T00:28:27.000Z",
+    "createTime": 1795393707,
+    "locationCreated": "US",
+    "isAd": false,
+    "authorMeta": {
+      "id": "creator-4-id",
+      "name": "creator-4",
+      "profileUrl": "https://www.tiktok.com/@creator-4",
+      "nickName": "creator-4",
+      "verified": false
+    },
+    "musicMeta": {
+      "musicName": "Sample track",
+      "musicAuthor": "creator-4",
+      "musicOriginal": true
+    },
+    "webVideoUrl": "https://www.tiktok.com/@creator-4/video/4",
+    "videoMeta": {
+      "height": 1280,
+      "width": 720,
+      "duration": 57.742
+    },
+    "diggCount": 1849,
+    "shareCount": 183,
+    "playCount": 33447,
+    "collectCount": 731,
+    "commentCount": 34,
+    "repostCount": null,
+    "hashtags": [
+      {
+        "id": "1",
+        "name": "sampletag",
+        "title": null
+      }
+    ],
+    "isSlideshow": false,
+    "searchQuery": "sample keyword"
+  }
+]

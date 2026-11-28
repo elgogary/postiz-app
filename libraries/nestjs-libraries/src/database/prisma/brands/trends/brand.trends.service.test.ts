@@ -10,7 +10,7 @@ const WEEK = new Date('2026-11-22T00:00:00Z');
 const recent = new Date(NOW.getTime() - 86400000).toISOString();
 const old = new Date(NOW.getTime() - 20 * 86400000).toISOString();
 
-const plan = { language: 'en', country: 'US', newsQueries: ['q1'], tech: true, githubQueries: ['g1'], linkedinKeywords: ['k1'], tiktok: { country: 'US', industry: 'Tech' } };
+const plan = { language: 'en', country: 'US', newsQueries: ['q1'], tech: true, githubQueries: ['g1'], linkedinKeywords: ['k1'], videoKeywords: [] as string[], tiktok: { country: 'US', industry: 'Tech' } };
 const cluster = (i: number, over: Record<string, unknown> = {}) => ({
   title: `Topic ${i}`, kind: 'topic', pillar: 'Ops', countQuery: `cq${i}`, itemIds: [], fit: 'fits', hook: `Hook ${i}`, angle: 'Angle', bullets: ['a', 'b', 'c'], ...over,
 });
@@ -61,7 +61,7 @@ function setup(opts: { role?: string; rows?: Record<string, unknown>[]; plan?: u
   const none = async () => [];
   svc.sources = {
     newsItems: async (q: string) => [{ title: `News ${q}`, url: `https://n/${q}`, source: 'Src', date: recent }],
-    newsTopic: none, hackerNewsTop: none, githubNew: none, linkedinPosts: none, tiktokHashtags: none,
+    newsTopic: none, hackerNewsTop: none, githubNew: none, linkedinPosts: none, tiktokHashtags: none, tiktokVideos: none,
     newsWeeks: async () => [{ count: 20, outlets: 10 }, { count: 10, outlets: 5 }, { count: 10, outlets: 5 }, { count: 10, outlets: 5 }, { count: 10, outlets: 5 }],
     ...opts.sources,
   } as never;
@@ -286,4 +286,43 @@ test('the topic prompt takes at most the quota of each kind, in the order found'
   assert.equal(picked[0].id, 'l0');
   const { user } = clusterPrompt({ brand: 'Brand A', language: 'en', pillars: ['AI'], items } as any);
   assert.ok(user.includes('l29 [linkedin]') && !user.includes('l30 [linkedin]'));
+});
+
+test('video keywords: each is searched in the plan country, kept as a TikTok item, and its views feed the signal', async () => {
+  const asked: string[][] = [];
+  const s = setup({
+    plan: { ...plan, videoKeywords: ['startup idea', 'فكرة تطبيق'] },
+    clusters: [cluster(1, { itemIds: ['n1', 'n2', 'n3'] })],
+    sources: {
+      tiktokVideos: async (k: string, c: string) => { asked.push([k, c]); return k === 'startup idea'
+        ? [{ text: 'Video one', url: 'https://www.tiktok.com/@creator-1/video/1', date: recent, views: 250000, likes: 1, shares: 1, comments: 1, sound: '' },
+          { text: 'Video two', url: 'https://www.tiktok.com/@creator-2/video/2', date: recent, views: 900, likes: 1, shares: 1, comments: 1, sound: '' }] : []; },
+      tiktokHashtags: async () => [{ name: 'tag', url: 'https://www.tiktok.com/tag/x', views: 9e9, videos: 1, trend: '', momentumPct: null }],
+      newsItems: async () => [],
+    },
+  });
+  await s.svc.run('o');
+  assert.deepEqual(asked, [['startup idea', 'US'], ['فكرة تطبيق', 'US']]);
+  const items = ((s.calls.find((c) => c[0] === 'cluster')![1]) as { items: { id: string; kind: string; title: string; source: string; metric: string }[] }).items;
+  assert.deepEqual(items.filter((i) => i.title.startsWith('Video')).map((i) => [i.kind, i.source, i.metric]), [['tiktok', 'TikTok', '250000 views'], ['tiktok', 'TikTok', '900 views']]);
+  const row = (saved(s.calls)[4] as Record<string, any>[])[0];
+  assert.equal(row.signals.tiktokViews, 250000);
+});
+
+test('a failing video source is logged once and skipped; no keywords means no call', async () => {
+  let calls = 0;
+  const s = setup({ plan: { ...plan, videoKeywords: ['a', 'b'] }, sources: { tiktokVideos: async () => { calls++; throw new Error('Apify actor x answered 500'); } } });
+  await s.svc.run('o');
+  assert.equal(calls, 2);
+  calls = 0;
+  const t = setup({ sources: { tiktokVideos: async () => { calls++; return []; } } });
+  await t.svc.run('o');
+  assert.equal(calls, 0);
+});
+
+test('parsePlan: videoKeywords are clamped to 3 strings of 60 characters, missing means empty', () => {
+  const p = parsePlan(JSON.stringify({ newsQueries: ['a'], videoKeywords: ['x'.repeat(80), 'b', '', 'c', 'd'] }))!;
+  assert.deepEqual([p.videoKeywords.length, p.videoKeywords[0].length], [3, 60]);
+  assert.deepEqual(parsePlan(JSON.stringify({ newsQueries: ['a'] }))!.videoKeywords, []);
+  assert.equal(PROMPT_QUOTA.tiktok, 20);
 });
