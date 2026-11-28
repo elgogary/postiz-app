@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { BrandTrendsService, TrendSources } from './brand.trends.service';
-import { clusterPrompt, parseClusters, parsePlan } from './trend.ai';
+import { clusterPrompt, parseClusters, parsePlan, promptItems, PROMPT_QUOTA } from './trend.ai';
 
 const NOW = new Date('2026-11-25T10:00:00Z');
 const WEEK = new Date('2026-11-22T00:00:00Z');
@@ -273,4 +273,17 @@ test('a failed news source is not asked again for the same brand', async () => {
   const s = setup({ plan: { ...plan, newsQueries: ['q1', 'q2', 'q3'] }, sources: { newsItems: async () => { n++; throw new Error('Source answered 429'); } } });
   await s.svc.run('o');
   assert.equal(n, 1);
+});
+
+test('the topic prompt takes at most the quota of each kind, in the order found', () => {
+  const items = [
+    ...Array.from({ length: 150 }, (_, n) => ({ id: `l${n}`, kind: 'linkedin', title: `post ${n}`, source: 'LinkedIn', metric: '' })),
+    ...Array.from({ length: 80 }, (_, n) => ({ id: `n${n}`, kind: 'news', title: `news ${n}`, source: 'Outlet', metric: '' })),
+  ];
+  const picked = promptItems(items);
+  assert.equal(picked.filter((x) => x.kind === 'linkedin').length, PROMPT_QUOTA.linkedin);
+  assert.equal(picked.filter((x) => x.kind === 'news').length, PROMPT_QUOTA.news);
+  assert.equal(picked[0].id, 'l0');
+  const { user } = clusterPrompt({ brand: 'Brand A', language: 'en', pillars: ['AI'], items } as any);
+  assert.ok(user.includes('l29 [linkedin]') && !user.includes('l30 [linkedin]'));
 });
