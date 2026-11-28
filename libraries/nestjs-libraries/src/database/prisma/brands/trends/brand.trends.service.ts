@@ -55,12 +55,12 @@ export class BrandTrendsService {
   constructor(private _brands: BrandsService, private _brandsRepo: BrandsRepository, private _repo: BrandTrendsRepository,
     private _ideas: BrandIdeasRepository, private _ai: TrendAi) {}
 
-  async run(orgId?: string): Promise<RunResult[]> {
+  async run(orgId?: string, brandId?: string): Promise<RunResult[]> {
     const orgs = orgId ? [orgId] : await this._repo.orgsWithPillars();
     const out: RunResult[] = [];
     for (const org of orgs) {
       try {
-        for (const brand of await this._brandsRepo.customers(org)) out.push(await this.runBrand(org, brand));
+        for (const brand of (await this._brandsRepo.customers(org)).filter((b) => !brandId || b.id === brandId)) out.push(await this.runBrand(org, brand));
       } catch (e) {
         this._log.warn(`Trends: an organization was skipped (${reason(e)})`);
       }

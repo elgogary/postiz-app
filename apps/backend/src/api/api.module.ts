@@ -37,6 +37,8 @@ import { EngagementController } from '@gitroom/backend/api/routes/engagement.con
 import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
 import { BrandPostsController } from '@gitroom/backend/api/routes/brand.posts.controller';
 import { BrandIdeasController } from '@gitroom/backend/api/routes/brand.ideas.controller';
+import { BrandTrendsController } from '@gitroom/backend/api/routes/brand.trends.controller';
+import { BrandTrendsCronService } from '@gitroom/backend/services/brand.trends.cron.service';
 import { BrandEmailController } from '@gitroom/backend/api/routes/brand.email.controller';
 // <<< SANAD-BRANDS
 import { SignatureController } from '@gitroom/backend/api/routes/signature.controller';
@@ -76,6 +78,7 @@ const authenticatedController = [
   BrandsController,
   BrandPostsController,
   BrandIdeasController,
+  BrandTrendsController,
   BrandEmailController,
   // <<< SANAD-BRANDS
   SignatureController,
@@ -122,6 +125,9 @@ const authenticatedController = [
     // >>> SANAD-ENGAGEMENT
     EngagementCronService,
     // <<< SANAD-ENGAGEMENT
+    // >>> SANAD-BRANDS
+    BrandTrendsCronService,
+    // <<< SANAD-BRANDS
     ChannelProfileSyncService,
   ],
   get exports() {
