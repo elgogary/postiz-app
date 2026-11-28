@@ -163,7 +163,8 @@ export const SECURITY_FEEDS: { url: string; source: string }[] = [
   { url: 'https://krebsonsecurity.com/feed/', source: 'KrebsOnSecurity' },
   { url: 'https://www.schneier.com/feed/atom/', source: 'Schneier on Security' },
 ];
-const BROWSER_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+// an honest reader name: a fake browser string is refused by some sites (Schneier answered 403 to it, 28 Nov 2026)
+const BROWSER_UA = 'Mozilla/5.0 (compatible; hub-trends/1.0)';
 // a feed may answer with one redirect, and only to its own host (feedburner: also to its outlet's site)
 const FEED_REDIRECT_HOSTS: Record<string, string[]> = { 'feeds.feedburner.com': ['feeds.feedburner.com', 'thehackernews.com', 'www.thehackernews.com'] };
 
