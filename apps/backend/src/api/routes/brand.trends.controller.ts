@@ -1,5 +1,5 @@
 // >>> SANAD-BRANDS: weekly trends live under /brand-trends (same reason as /brand-ideas).
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Logger, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Organization, User } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -19,6 +19,8 @@ function parseTrendScope(scope?: string): string {
 @ApiTags('Brands')
 @Controller('/brand-trends')
 export class BrandTrendsController {
+  private readonly _log = new Logger('BrandTrends');
+
   constructor(private _trends: BrandTrendsService) {}
 
   @Get('/')
@@ -26,13 +28,18 @@ export class BrandTrendsController {
     return this._trends.list(org.id, user.id, orgRoleOf(org), parseTrendScope(scope));
   }
 
-  // a run can take minutes: a normal awaited request, for the first fill and checks
+  // a run takes minutes (the web proxy gives up after one): it starts here and goes on in the background; read the
+  // rows back with GET when it is done
   @Post('/run')
   run(@GetOrgFromRequest() org: Organization, @Body() body: { brandId?: string }) {
     if (!isOrgAdmin(orgRoleOf(org))) throw new ForbiddenException('Only an organization admin can run trends');
     const brandId = body?.brandId;
     if (brandId !== undefined && (typeof brandId !== 'string' || !TREND_ID.test(brandId))) throw new BadRequestException('Invalid brand');
-    return this._trends.run(org.id, brandId);
+    this._trends.run(org.id, brandId).then(
+      (res) => this._log.log(`Trends run: ${res.filter((r) => !r.skipped).length} brands, ${res.reduce((n, r) => n + (r.trends || 0), 0)} trends`),
+      (e) => this._log.error(`Trends run failed: ${(e as Error)?.message}`),
+    );
+    return { started: true };
   }
 
   @Post('/:id/idea')

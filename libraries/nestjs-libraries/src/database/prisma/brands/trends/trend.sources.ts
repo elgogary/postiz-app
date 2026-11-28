@@ -70,8 +70,17 @@ export function newsTopicUrl(topic: string, lang: string, country: string): stri
   return `https://news.google.com/rss/headlines/section/topic/${encodeURIComponent(topic)}?` + new URLSearchParams({ hl: lang, gl: country, ceid: `${country}:${lang.split('-')[0]}` });
 }
 
+// a topic feed answers with one redirect to /rss/topics/<id> on the same host: follow only that one
 export async function newsTopic(topic: string, lang: string, country: string, f: FetchFn = fetch): Promise<NewsItem[]> {
-  return parseNewsRss(await getText(newsTopicUrl(topic, lang, country), f));
+  const url = newsTopicUrl(topic, lang, country);
+  const res = await f(url, { headers: { 'User-Agent': 'hub-trends' }, redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS) });
+  if (res.status >= 300 && res.status < 400) {
+    const next = new URL(res.headers.get('location') || '', url);
+    if (next.protocol !== 'https:' || next.hostname !== 'news.google.com') throw new Error(`Source answered ${res.status}`);
+    return parseNewsRss(await getText(next.toString(), f));
+  }
+  if (!res.ok) throw new Error(`Source answered ${res.status}`);
+  return parseNewsRss(await res.text());
 }
 
 // window w (0 = this week) is the 7 days ending at weekEnd minus 7*w days

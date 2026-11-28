@@ -4,8 +4,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   decodeEntities, parseNewsRss, newsUrl, newsWindow, newsWeeks, mapHnItem, hackerNewsTop, githubUrl, mapGithub, githubNew,
-  mapLinkedin, mapTiktok, linkedinInput, tiktokInput, linkedinPosts, tiktokHashtags, apifyRun,
+  mapLinkedin, mapTiktok, linkedinInput, tiktokInput, linkedinPosts, tiktokHashtags, apifyRun, newsTopic,
 } from './trend.sources';
+
+test('newsTopic follows one redirect on news.google.com only', async () => {
+  const calls: string[] = [];
+  const hop = (location: string) => (async (url: string) => {
+    calls.push(url);
+    return calls.length === 1 ? new Response(null, { status: 302, headers: { location } }) : res(fx('news.sample.xml'));
+  }) as any;
+  const items = await newsTopic('TECHNOLOGY', 'ar', 'SA', hop('https://news.google.com/rss/topics/ABC?hl=ar&gl=SA&ceid=SA:ar'));
+  assert.ok(items.length > 0);
+  assert.equal(calls[1], 'https://news.google.com/rss/topics/ABC?hl=ar&gl=SA&ceid=SA:ar');
+  calls.length = 0;
+  await assert.rejects(() => newsTopic('TECHNOLOGY', 'ar', 'SA', hop('https://other.example.test/rss')), /302/);
+  assert.equal(calls.length, 1);
+});
 
 const fx = (n: string) => readFileSync(join(__dirname, 'fixtures', n), 'utf8');
 const res = (body: unknown, status = 200) => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
