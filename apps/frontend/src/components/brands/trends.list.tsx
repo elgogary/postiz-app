@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { roundParts, trendParts, type TrendItem, type TrendView } from '@gitroom/helpers/brands/trend.rules';
+import { roundParts, STRONG_SCORE, trendParts, type TrendItem, type TrendView } from '@gitroom/helpers/brands/trend.rules';
 import { BrandSummary, TrendsData, dirOf, errorText, useBrandsApi } from './brands.api';
 import { Retry, Skeleton, TD as TDBASE, TH, Text } from './brand.email.ui';
 import { IdeaPlan } from './idea.plan';
@@ -52,6 +52,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
   const [all, setAll] = useState<BrandSummary[]>([]);
   const [failed, setFailed] = useState('');
   const [source, setSource] = useState('');
+  const [strong, setStrong] = useState(false);
   const [brand, setBrand] = useState('');
   const [open, setOpen] = useState('');
   const [busy, setBusy] = useState('');
@@ -67,12 +68,16 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
     return api.trends(scope).then((d) => { if (mine === seq.current) setData(d); })
       .catch((e) => { if (mine === seq.current) setFailed(errorText(e, tt.current)); });
   }, [api, scope]);
-  useEffect(() => { setData(null); setSource(''); setBrand(''); setOpen(''); setFresh({}); load(); return () => { seq.current += 1; }; }, [load]);
+  useEffect(() => { setData(null); setSource(''); setStrong(false); setBrand(''); setOpen(''); setFresh({}); load(); return () => { seq.current += 1; }; }, [load]);
   useEffect(() => { if (page) api.list().then(setAll).catch(() => setAll([])); }, [api, page]);
 
   const trends = data?.trends || [];
-  const byBrand = useMemo(() => trends.filter((v) => !brand || v.brandId === brand), [trends, brand]);
-  const shown = source ? byBrand.filter((v) => has(v, source as TrendItem['kind'])) : byBrand;
+  const ofBrand = useMemo(() => trends.filter((v) => !brand || v.brandId === brand), [trends, brand]);
+  const strongCount = ofBrand.filter((v) => v.score >= STRONG_SCORE).length;
+  const byBrand = useMemo(() => (strong ? ofBrand.filter((v) => v.score >= STRONG_SCORE) : ofBrand), [ofBrand, strong]);
+  // a picked source that the Score 30+ filter emptied falls back to All, so the list never goes blank behind a hidden chip
+  const picked = source && byBrand.some((v) => has(v, source as TrendItem['kind'])) ? source : '';
+  const shown = picked ? byBrand.filter((v) => has(v, picked as TrendItem['kind'])) : byBrand;
   const brands = useMemo(() => {
     const seen = new Map<string, string>();
     trends.forEach((v) => seen.set(v.brandId, v.brandName));
@@ -148,12 +153,16 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
           </select>
         )}
         <div role="group" aria-label={t('filter_trends_by_source', 'Filter trends by source')} className="flex flex-wrap gap-[8px]">
-          <button aria-pressed={!source} onClick={() => setSource('')} className={`${QUIET} ${!source ? ON : ''}`}>{t('all', 'All')} {byBrand.length}</button>
+          <button aria-pressed={!picked} onClick={() => setSource('')} className={`${QUIET} ${!picked ? ON : ''}`}>{t('all', 'All')} {byBrand.length}</button>
           {SOURCES.filter(([k]) => byBrand.some((v) => has(v, k))).map(([k, key, label]) => (
-            <button key={k} aria-pressed={source === k} onClick={() => setSource(k)} className={`${QUIET} ${source === k ? ON : ''}`}>
+            <button key={k} aria-pressed={picked === k} onClick={() => setSource(k)} className={`${QUIET} ${picked === k ? ON : ''}`}>
               {t(key, label)} {byBrand.filter((v) => has(v, k)).length}
             </button>
           ))}
+          <span aria-hidden="true" className="w-px h-[20px] self-center bg-fifth" />
+          <button aria-pressed={strong} onClick={() => setStrong(!strong)} className={`${QUIET} ${strong ? ON : ''}`}>
+            {t('trend_strong', 'Score {n}+').replace('{n}', String(STRONG_SCORE))} {strongCount}
+          </button>
         </div>
         <span className="ms-auto text-[13px] text-customColor18">{t('trends_week', 'Week of {from} to {to}').replace('{from}', from).replace('{to}', to)}</span>
       </div>

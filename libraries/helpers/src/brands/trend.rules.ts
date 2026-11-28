@@ -1,5 +1,7 @@
 // >>> SANAD-BRANDS: trends: the weekly score, week start, topic key and the row types. Pure, shared by backend and frontend.
 export const MAX_TRENDS = 8;
+// the "Score 30+" filter on the Trends list: weaker rows stay, one tap hides them
+export const STRONG_SCORE = 30;
 
 export interface TrendSignals {
   hnPoints: number; topRepoStars: number; linkedinReactions: number; outlets: number; platforms: number; freshShare: number;
