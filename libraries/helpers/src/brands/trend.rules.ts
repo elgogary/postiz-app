@@ -28,13 +28,16 @@ export const growthOf = (thisWeek: number, prev: number[]): number | null => {
   return (thisWeek - mean) / Math.max(mean, 5);
 };
 
+const part = (v: number, max = Infinity) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), max) : 0);
+
 export const trendScore = (i: TrendScoreInput): number => {
-  const growth = (40 * Math.min(Math.max(i.growth ?? 0, 0), 2)) / 2;
-  const reach = 20 * Math.min(1, Math.max(i.hnPoints / 300, i.topRepoStars / 1000, i.linkedinReactions / 500));
-  const spread = 20 * Math.min(1, i.outlets / 40 + 0.25 * (i.platforms - 1));
-  return Math.round(growth + reach + spread + 20 * i.freshShare);
+  const growth = (40 * part(i.growth ?? 0, 2)) / 2;
+  const reach = 20 * Math.min(1, Math.max(part(i.hnPoints) / 300, part(i.topRepoStars) / 1000, part(i.linkedinReactions) / 500));
+  const spread = 20 * Math.min(1, part(i.outlets) / 40 + 0.25 * (Math.max(part(i.platforms), 1) - 1));
+  return Math.round(growth + reach + spread + 20 * part(i.freshShare, 1));
 };
 
+// diacritics (Arabic harakat, accents) are dropped first, so the same word with and without them gets one key
 export const topicKey = (title: string): string =>
-  title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().slice(0, 80).trim();
+  title.normalize('NFKD').replace(/\p{M}+/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().slice(0, 80).trim();
 // <<< SANAD-BRANDS

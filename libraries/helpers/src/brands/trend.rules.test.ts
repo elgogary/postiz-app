@@ -35,4 +35,18 @@ test('topicKey: lowercase, any script, single spaces, max 80', () => {
   assert.equal(topicKey('a'.repeat(100)).length, 80);
 });
 
+test('topicKey: the same word with and without diacritics gets one key', () => {
+  assert.equal(topicKey('مُحَمَّد'), topicKey('محمد'));
+  assert.equal(topicKey('Café Résumé'), 'cafe resume');
+});
+
+test('trendScore: bad inputs never break the score', () => {
+  const zero = { growth: null, hnPoints: 0, topRepoStars: 0, linkedinReactions: 0, outlets: 0, platforms: 0, freshShare: 0 };
+  assert.equal(trendScore(zero), 0);
+  assert.equal(trendScore({ ...zero, growth: Number.NaN }), 0);
+  assert.equal(trendScore({ ...zero, freshShare: 3 }), 20);
+  assert.equal(trendScore({ ...zero, freshShare: -1 }), 0);
+  assert.equal(trendScore({ ...zero, hnPoints: Number.NaN, outlets: 40, platforms: 1 }), 20);
+});
+
 test('MAX_TRENDS', () => assert.equal(MAX_TRENDS, 8));
