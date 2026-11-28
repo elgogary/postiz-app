@@ -6,6 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import type { BrandRole } from '@gitroom/helpers/brands/brand.rules';
 import type { ConsentKind, EmailOverview } from '@gitroom/helpers/brands/email.rules';
+import { listLabel } from '@gitroom/helpers/brands/email.rules';
 import { EmailContactsView } from './brand.email.contacts';
 import { EmailImportModal } from './brand.email.import';
 import { Chip, EmailGo, EmailSwitch, fmtDate, NUM, QUIET, TD, TH, TONE, Text } from './brand.email.ui';
@@ -24,7 +25,7 @@ export const BrandEmailLists: FC<{
   const modals = useModals();
   const approver = role === 'approve';
   const open = list && approver ? data.lists.find((l) => l.channelId === list.channelId && l.id === list.id) : null;
-  if (open) return <EmailContactsView key={`${open.channelId}:${open.id}`} brandId={brandId} list={open} go={go} />;
+  if (open) return <EmailContactsView key={`${open.channelId}:${open.id}`} brandId={brandId} brandName={brandName} list={open} go={go} />;
 
   return (
     <div className="flex flex-col gap-[16px]">
@@ -59,8 +60,8 @@ export const BrandEmailLists: FC<{
                   <tr key={`${l.channelId}:${l.id}`} onClick={approver ? go1 : undefined} className={approver ? 'cursor-pointer hover:bg-sixth' : ''}>
                     <td className={TD}>
                       {approver
-                        ? <button className="text-start font-[600]" onClick={(e) => { e.stopPropagation(); go1(); }}><Text text={l.name} /></button>
-                        : <span className="font-[600]"><Text text={l.name} /></span>}
+                        ? <button className="text-start font-[600]" onClick={(e) => { e.stopPropagation(); go1(); }}><Text text={listLabel(l.name, brandName)} /></button>
+                        : <span className="font-[600]"><Text text={listLabel(l.name, brandName)} /></span>}
                       {l.source === 'brevo' && <div className="text-[12px] text-customColor18">{t('email_from_brevo', 'From Brevo')}</div>}
                     </td>
                     <td className={`${TD} ${NUM}`}>{l.contacts}</td>

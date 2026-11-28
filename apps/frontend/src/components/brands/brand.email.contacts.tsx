@@ -3,6 +3,7 @@
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { EmailContact, EmailListRow } from '@gitroom/helpers/brands/email.rules';
+import { listLabel } from '@gitroom/helpers/brands/email.rules';
 import { errorText, useBrandsApi } from './brands.api';
 import { Chip, EmailGo, fmtDate, QUIET, Retry, Skeleton, TD, TH, TONE, Text } from './brand.email.ui';
 
@@ -11,7 +12,7 @@ const STATUS: Record<EmailContact['status'], [string, string]> = {
   subscribed: [TONE.green, 'Subscribed'], unsubscribed: [TONE.grey, 'Unsubscribed'], unconfirmed: [TONE.amber, 'Not confirmed'], blocklisted: [TONE.amber, 'Blocked'],
 };
 
-export const EmailContactsView: FC<{ brandId: string; list: EmailListRow; go: EmailGo }> = ({ brandId, list, go }) => {
+export const EmailContactsView: FC<{ brandId: string; brandName: string; list: EmailListRow; go: EmailGo }> = ({ brandId, brandName, list, go }) => {
   const t = useT();
   const api = useBrandsApi();
   const [page, setPage] = useState(1);
@@ -37,7 +38,7 @@ export const EmailContactsView: FC<{ brandId: string; list: EmailListRow; go: Em
   return (
     <div className="flex flex-col gap-[16px]">
       <div className="text-[13px] text-customColor18">
-        <button className="font-[600] text-[#5221b8] dark:text-[#c4b5fd] [@media(max-width:480px)]:min-h-[44px]" onClick={() => go({ tab: 'email', filter: 'lists' })}>{t('email_lists', 'Lists')}</button> / <Text text={list.name} />
+        <button className="font-[600] text-[#5221b8] dark:text-[#c4b5fd] [@media(max-width:480px)]:min-h-[44px]" onClick={() => go({ tab: 'email', filter: 'lists' })}>{t('email_lists', 'Lists')}</button> / <Text text={listLabel(list.name, brandName)} />
       </div>
       {error ? <Retry text={error} onRetry={load} /> : !data ? <Skeleton /> : (
         <>
