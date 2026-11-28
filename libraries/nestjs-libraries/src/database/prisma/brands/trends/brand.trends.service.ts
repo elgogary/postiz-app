@@ -156,7 +156,9 @@ export class BrandTrendsService {
     if (plan.tiktok) for (const t of await safe('tiktok', () => s.tiktokHashtags(plan.tiktok!.country, plan.tiktok!.industry), [])) {
       add({ title: `#${t.name}`, url: t.url, source: 'TikTok', date: '', kind: 'tiktok', metric: `${t.views} views`, n: t.views });
     }
-    for (const k of plan.videoKeywords || []) for (const v of await safe('tiktok-videos', () => s.tiktokVideos(k, plan.country), [])) {
+    // the (up to 3) video searches run side by side: one Apify run can take two minutes
+    const videoLists = await Promise.all((plan.videoKeywords || []).map((k) => safe('tiktok-videos', () => s.tiktokVideos(k, plan.country), [])));
+    for (const v of videoLists.flat()) {
       add({ title: v.text, url: v.url, source: 'TikTok', date: v.date, kind: 'tiktok', metric: `${v.views} views`, n: v.views });
     }
     const room = Math.max(0, MAX_FOUND - out.length);

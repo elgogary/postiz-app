@@ -185,12 +185,14 @@ test('tiktok videos: mapping from the saved sample keeps no author field', () =>
   assert.equal(v.length, 4);
   assert.deepEqual(v[0], {
     text: 'Sample caption 1 about building an app from an idea #sampletag', url: 'https://www.tiktok.com/@creator-1/video/1',
-    date: '2026-11-23T06:12:37.000Z', views: 33515, likes: 2446, shares: 450, comments: 15, sound: 'original sound - creator-1',
+    date: '2026-11-23T06:12:37.000Z', views: 33515, likes: 2446, shares: 450, comments: 15, sound: '',
   });
   assert.deepEqual(Object.keys(v[0]), ['text', 'url', 'date', 'views', 'likes', 'shares', 'comments', 'sound']);
   assert.equal(v[2].text, 'Sample caption 3 with odd spacing');
   assert.equal(v[2].sound, '');
   assert.equal(mapTiktokVideos([{ text: 'x'.repeat(500), webVideoUrl: 'https://t/1' }, { text: 'no url' }])[0].text.length, 200);
+  assert.equal(mapTiktokVideos([{ text: 'a', webVideoUrl: 'https://t/1', musicMeta: { musicName: 'Track A' } }])[0].sound, 'Track A');
+  assert.equal(mapTiktokVideos([{ text: 'a', webVideoUrl: 'https://t/1', musicMeta: { musicName: 'Original sound - creator-9' } }])[0].sound, '');
 });
 
 test('tiktok videos: input adds the proxy country only for a 2-letter code', () => {

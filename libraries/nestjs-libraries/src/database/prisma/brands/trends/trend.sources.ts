@@ -209,7 +209,8 @@ export const mapTiktokVideos = (items: any[]): TiktokVideo[] =>
     text: String(v.text || '').replace(/\s+/g, ' ').trim().slice(0, 200), url: String(v.webVideoUrl),
     date: v.createTimeISO || (num(v.createTime) ? new Date(num(v.createTime) * 1000).toISOString() : ''),
     views: num(v.playCount), likes: num(v.diggCount), shares: num(v.shareCount), comments: num(v.commentCount),
-    sound: String(v.musicMeta?.musicName || ''),
+    // TikTok names a creator's own audio "original sound - <handle>": only a real track name is kept
+    sound: /^original sound/i.test(String(v.musicMeta?.musicName || '')) ? '' : String(v.musicMeta?.musicName || ''),
   }));
 
 export const tiktokVideosInput = (keyword: string, country: string) => {
