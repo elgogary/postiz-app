@@ -139,7 +139,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
   };
 
   return (
-    <div className="flex flex-col gap-[12px]">
+    <div className="flex flex-col gap-[12px] min-w-0 w-full">
       <div className="flex flex-wrap items-center gap-[8px]">
         {page && (
           <select aria-label={t('brand', 'Brand')} value={brand} onChange={(e) => setBrand(e.target.value)} className={SELECT}>
@@ -158,7 +158,7 @@ export const TrendsList: FC<{ scope: string }> = ({ scope }) => {
         <span className="ms-auto text-[13px] text-customColor18">{t('trends_week', 'Week of {from} to {to}').replace('{from}', from).replace('{to}', to)}</span>
       </div>
       {failed && <Retry text={failed} onRetry={load} />}
-      <div className="bg-sixth border border-fifth rounded-[12px] overflow-x-auto">
+      <div className="bg-sixth border border-fifth rounded-[12px] overflow-x-auto max-w-full">
         <table className="w-full min-w-[960px] table-fixed border-collapse text-[13px]">
           <colgroup>
             <col style={{ width: page ? 280 : 300 }} />{page && <col style={{ width: 168 }} />}<col style={{ width: 76 }} /><col style={{ width: 200 }} /><col /><col style={{ width: 176 }} /><col style={{ width: 144 }} />

@@ -88,11 +88,23 @@ export function newsWindow(weekEnd: Date, w: number): { from: Date; to: Date } {
   return { from: new Date(weekEnd.getTime() - DAY * 7 * (w + 1)), to: new Date(weekEnd.getTime() - DAY * 7 * w) };
 }
 
-export async function newsWeeks(q: string, lang: string, country: string, weekEnd: Date, f: FetchFn = fetch): Promise<NewsWeek[]> {
+// Google News answers 429 to a quick burst: a pause between the five weeks, and one retry after a longer wait
+const NEWS_PAUSE_MS = 1500;
+const NEWS_RETRY_MS = 8000;
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export async function newsWeeks(q: string, lang: string, country: string, weekEnd: Date, f: FetchFn = fetch, pauseMs = NEWS_PAUSE_MS): Promise<NewsWeek[]> {
   const out: NewsWeek[] = [];
   for (let w = 0; w < 5; w++) {
+    if (w > 0) await wait(pauseMs);
     const { from, to } = newsWindow(weekEnd, w);
-    const items = parseNewsRss(await getText(newsUrl(q, lang, country, from, to), f));
+    const url = newsUrl(q, lang, country, from, to);
+    const xml = await getText(url, f).catch(async (e: Error) => {
+      if (!/ 429$/.test(e.message)) throw e;
+      await wait(pauseMs && NEWS_RETRY_MS);
+      return getText(url, f);
+    });
+    const items = parseNewsRss(xml);
     out.push({ count: items.length, outlets: new Set(items.map((i) => i.source).filter(Boolean)).size });
   }
   return out;

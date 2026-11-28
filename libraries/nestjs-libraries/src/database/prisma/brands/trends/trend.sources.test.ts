@@ -60,11 +60,21 @@ test('newsWindow: 7-day windows ending at weekEnd, going back', () => {
 test('newsWeeks returns 5 entries with counts and distinct outlets, this week first', async () => {
   const urls: string[] = [];
   const f = (async (u: string) => { urls.push(u); return res(fx('news.sample.xml')); }) as any;
-  const weeks = await newsWeeks('erp', 'en', 'US', new Date('2026-11-28T00:00:00Z'), f);
+  const weeks = await newsWeeks('erp', 'en', 'US', new Date('2026-11-28T00:00:00Z'), f, 0);
   assert.equal(weeks.length, 5);
   assert.deepEqual(weeks[0], { count: 3, outlets: 2 });
   assert.match(new URL(urls[0]).searchParams.get('q'), /after:2026-11-21 before:2026-11-28/);
   assert.match(new URL(urls[4]).searchParams.get('q'), /after:2026-10-24 before:2026-10-31/);
+});
+
+test('newsWeeks retries a week once after 429, and a second 429 fails', async () => {
+  let n = 0;
+  const once = (async () => (++n === 2 ? res('busy', 429) : res(fx('news.sample.xml')))) as any;
+  const weeks = await newsWeeks('erp', 'en', 'US', new Date('2026-11-28T00:00:00Z'), once, 0);
+  assert.equal(weeks.length, 5);
+  assert.equal(n, 6);
+  const always = (async () => res('busy', 429)) as any;
+  await assert.rejects(() => newsWeeks('erp', 'en', 'US', new Date('2026-11-28T00:00:00Z'), always, 0), /429/);
 });
 
 test('mapHnItem and the points filter, 8 at a time over the first 100 ids', async () => {
