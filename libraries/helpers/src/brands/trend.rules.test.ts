@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { weekStart, growthOf, trendScore, topicKey, MAX_TRENDS } from './trend.rules';
+import { weekStart, growthOf, trendScore, trendParts, topicKey, MAX_TRENDS } from './trend.rules';
 
 const base = { hnPoints: 0, topRepoStars: 0, linkedinReactions: 0, outlets: 0, platforms: 1, freshShare: 0 };
 
@@ -50,3 +50,10 @@ test('trendScore: bad inputs never break the score', () => {
 });
 
 test('MAX_TRENDS', () => assert.equal(MAX_TRENDS, 8));
+
+test('parts: the four parts add up to the score', () => {
+  const i = { ...base, growth: 0.63, outlets: 53, freshShare: 1 };
+  const p = trendParts(i);
+  assert.deepEqual([Math.round(p.growth), Math.round(p.engagement), Math.round(p.spread), Math.round(p.freshness)], [13, 0, 20, 20]);
+  assert.equal(Math.round(p.growth + p.engagement + p.spread + p.freshness), trendScore(i));
+});

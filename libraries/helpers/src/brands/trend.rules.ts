@@ -30,11 +30,16 @@ export const growthOf = (thisWeek: number, prev: number[]): number | null => {
 
 const part = (v: number, max = Infinity) => (Number.isFinite(v) ? Math.min(Math.max(v, 0), max) : 0);
 
+export const trendParts = (i: TrendScoreInput) => ({
+  growth: (40 * part(i.growth ?? 0, 2)) / 2,
+  engagement: 20 * Math.min(1, Math.max(part(i.hnPoints) / 300, part(i.topRepoStars) / 1000, part(i.linkedinReactions) / 500)),
+  spread: 20 * Math.min(1, part(i.outlets) / 40 + 0.25 * (Math.max(part(i.platforms), 1) - 1)),
+  freshness: 20 * part(i.freshShare, 1),
+});
+
 export const trendScore = (i: TrendScoreInput): number => {
-  const growth = (40 * part(i.growth ?? 0, 2)) / 2;
-  const reach = 20 * Math.min(1, Math.max(part(i.hnPoints) / 300, part(i.topRepoStars) / 1000, part(i.linkedinReactions) / 500));
-  const spread = 20 * Math.min(1, part(i.outlets) / 40 + 0.25 * (Math.max(part(i.platforms), 1) - 1));
-  return Math.round(growth + reach + spread + 20 * part(i.freshShare, 1));
+  const p = trendParts(i);
+  return Math.round(p.growth + p.engagement + p.spread + p.freshness);
 };
 
 // diacritics (Arabic harakat, accents) are dropped first, so the same word with and without them gets one key

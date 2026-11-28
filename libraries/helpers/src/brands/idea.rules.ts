@@ -18,7 +18,7 @@ export interface IdeaRow {
 }
 export interface IdeaPlan { brandId: string; date: string; postId: string | null; postState: string | null }
 export interface IdeaView extends IdeaFields {
-  id: string; status: IdeaStatus; note: string; createdAt: string; briefId: string | null;
+  id: string; status: IdeaStatus; note: string; createdAt: string; briefId: string | null; tags: string[];
   plannedFor: { brandId: string; date: string; postId: string | null } | null;
 }
 export interface DraftInput { brand: string; voice: string; checks: string[]; idea: IdeaFields; format: Format }
@@ -92,7 +92,7 @@ export const ideaView = (r: IdeaRow, plan: IdeaPlan | null): IdeaView => {
     : plan && plan.postState === 'PUBLISHED' ? 'POSTED'
     : r.status === 'PLANNED' ? 'PLANNED' : 'NEW';
   return {
-    id: r.id, status, note: r.note || '', createdAt: r.createdAt, briefId: r.briefId,
+    id: r.id, status, note: r.note || '', createdAt: r.createdAt, briefId: r.briefId, tags: r.tags || [],
     hook: r.hook || old.hook, angle: r.hook ? r.angle : old.angle, bullets: r.hook ? bullets : old.bullets,
     brandIds: r.brandIds || [], topic: r.topic || 'General', pillars: r.pillars || [], format: asFormat(r.format),
     source: r.source || '',
