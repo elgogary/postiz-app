@@ -150,14 +150,19 @@ export class TrendAi {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const res = await client.chat.completions.create({
-          model: process.env.BRANDS_AI_MODEL || process.env.AGENT_AI_MODEL || 'deepseek-chat',
+          // trends use a model that answers without thinking first: a thinking model (deepseek-v4-flash) spent most of
+          // the answer budget on reasoning and cut the topics at about 2,000 characters (28 Nov 2026)
+          model: process.env.TRENDS_AI_MODEL && process.env.TRENDS_AI_MODEL.length > 0 ? process.env.TRENDS_AI_MODEL : 'deepseek-chat',
           temperature: 0.3,
           max_tokens: 8000,
           response_format: { type: 'json_object' },
           messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
         });
         const choice = res.choices?.[0];
-        if (choice?.finish_reason === 'length') this._log.warn(`The AI answer was cut at the length limit (${(choice.message?.content || '').length} characters)`);
+        if (choice?.finish_reason === 'length') {
+          const thought = (res.usage as { completion_tokens_details?: { reasoning_tokens?: number } } | undefined)?.completion_tokens_details?.reasoning_tokens ?? 0;
+          this._log.warn(`The AI answer was cut at the length limit (${(choice.message?.content || '').length} characters, ${thought} reasoning tokens)`);
+        }
         return choice?.message?.content || '';
       } catch (e) {
         // the error's kind, status and first words only: never the prompt, the answer or a key
